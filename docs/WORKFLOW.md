@@ -109,6 +109,21 @@ Release notes use these sections:
 
 Official automation must not create duplicate tags or Releases.
 
+## Distribution gates through v0.0.4
+
+Releases `v0.0.1` through `v0.0.4` are development milestones and are not VCC-installable package releases. During this period:
+
+- package release automation is manual and requires both `main` and `ENABLE_PACKAGE_RELEASE == 'true'`;
+- listing automation is manual and requires both `main` and `ENABLE_PACKAGE_LISTING == 'true'`;
+- both enablement variables remain unset;
+- the package manifest `url` does not yet point to a distributable ZIP;
+- the VPM listing and GitHub Pages remain disabled; and
+- a reviewed GitHub Release, if explicitly authorized, must not claim VCC installability.
+
+The existing `PACKAGE_NAME` variable does not enable distribution by itself. Missing, empty, or non-`true` enablement variables must keep the jobs skipped.
+
+Version `v0.0.5 — Release Pipeline` owns ZIP and `.unitypackage` validation, distributable manifest validation, listing generation, GitHub Pages configuration, automatic listing triggers, artifact checks, automated enforcement of release naming and structured notes, and automatic prerelease detection. These capabilities must not be reported as validated earlier.
+
 ## Language policy
 
 All persistent repository and user-facing product content is written in English, including code, identifiers, comments, documentation, package metadata, workflows, Issues, Milestones, Pull Requests, tags, Releases, test data, and examples.

@@ -70,7 +70,19 @@ The official template provides:
 - a manually dispatched package release workflow; and
 - a repository-listing workflow triggered by release activity or manual dispatch.
 
-For this foundation release, manual execution is restricted to `main` so that the working branch cannot create a tag, GitHub Release, or Pages deployment. The package release mechanism itself is not claimed as validated; full release-pipeline verification belongs to a later authorized release.
+Avatar Doctor deliberately keeps both distribution paths disabled through `v0.0.4`:
+
+- the package release job requires both `main` and `ENABLE_PACKAGE_RELEASE == 'true'`;
+- the listing job requires both `main` and `ENABLE_PACKAGE_LISTING == 'true'`; and
+- the listing workflow has only a manual trigger, with release and package-workflow triggers removed.
+
+Neither enablement variable is configured for `v0.0.1`. A missing, empty, or differently valued variable leaves its job safely skipped. The existing `PACKAGE_NAME` variable identifies the package for future automation but does not enable either pipeline.
+
+## Distribution status for v0.0.1
+
+Version `v0.0.1` is a foundation release, not a VCC-installable package release. The package manifest retains its `url` field, but that field does not yet point to a distributable ZIP. No installable ZIP, `.unitypackage`, distributable manifest, VPM listing, or GitHub Pages site has been generated or validated.
+
+GitHub Releases before `v0.0.5` may be used as reviewed development milestones, but they must not claim to be VPM packages installable through VCC. Complete artifact validation, distributable manifest validation, listing generation, Pages configuration, and restoration of automatic listing triggers belong to `v0.0.5 — Release Pipeline`.
 
 ## Unverified runtime items
 
@@ -78,4 +90,5 @@ For this foundation release, manual execution is restricted to `main` so that th
 - VRChat SDK resolution was not executed because no SDK dependency is declared.
 - Android tooling was not inspected through Unity Hub because Unity Hub and Unity were unavailable.
 - VPM/VCC installation was not executed.
-- Generated package archives and repository listings were not tested; no tag or GitHub Release is authorized for this release.
+- Generated package archives, distributable manifests, and repository listings were not tested; no tag or GitHub Release is authorized for this release.
+- GitHub Pages is not configured, and both distribution enablement variables remain intentionally unset until `v0.0.5`.

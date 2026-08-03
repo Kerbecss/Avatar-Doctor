@@ -3,7 +3,7 @@
 Avatar Doctor is a planned local-first Unity Editor package for explainable diagnostics, safe repairs, Quest conversion, and multi-platform publishing assistance for VRChat avatars.
 
 > [!WARNING]
-> Avatar Doctor is in **pre-alpha**. No functional scanner exists yet, and installation is not recommended for production use.
+> Avatar Doctor is in **pre-alpha**. No functional scanner exists yet, and version `v0.0.1` is not installable through VCC.
 
 ## Vision
 
@@ -38,6 +38,8 @@ Blender, external rigging, weight painting, modeling, vertex modification, and m
 ## Current repository status
 
 Release `v0.0.1` establishes repository identity, VPM package metadata, documentation, licensing, and the controlled development workflow. It does not add a Unity Editor window, assemblies, scanners, rules, diagnostics, repairs, Quest conversion logic, or publishing logic.
+
+No distributable ZIP, `.unitypackage`, VPM listing, or GitHub Pages site is available yet. Distribution remains deliberately disabled until `v0.0.5 — Release Pipeline` validates the artifacts, manifest, listing, and publication workflow.
 
 Read the complete [project roadmap](docs/ROADMAP.md) and the [controlled release workflow](docs/WORKFLOW.md) before contributing.
 
