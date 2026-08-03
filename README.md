@@ -1,76 +1,56 @@
-# VPM Package Template
+# Avatar Doctor
 
-Starter for making Packages, including automation for building and publishing them.
+Avatar Doctor is a planned local-first Unity Editor package for explainable diagnostics, safe repairs, Quest conversion, and multi-platform publishing assistance for VRChat avatars.
 
-Once you're all set up, you'll be able to push changes to this repository and have .zip and .unitypackage versions automatically generated, and a listing made which works in the VPM for delivering updates for this package. If you want to make a listing with a variety of packages, check out our [template-package-listing](https://github.com/vrchat-community/template-package-listing) repo.
+> [!WARNING]
+> Avatar Doctor is in **pre-alpha**. No functional scanner exists yet, and version `v0.0.1` is not installable through VCC.
 
-## ▶ Getting Started
+## Vision
 
-* Press [![Use This Template](https://user-images.githubusercontent.com/737888/185467681-e5fdb099-d99f-454b-8d9e-0760e5a6e588.png)](https://github.com/vrchat-community/template-package/generate)
-to start a new GitHub project based on this template.
-  * Choose a fitting repository name and description.
-  * Set the visibility to 'Public'. You can also choose 'Private' and change it later.
-  * You don't need to select 'Include all branches.'
-* Clone this repository locally using Git.
-  * If you're unfamiliar with Git and GitHub, [visit GitHub's documentation](https://docs.github.com/en/get-started/quickstart/git-and-github-learning-resources) to learn more.
-* Add the folder to Unity Hub and open it as a Unity Project.
-* After opening the project, wait while the VPM resolver is downloaded and added to your project.
-  * This gives you access to the VPM Package Maker and Package Resolver tools.
+Avatar Doctor is planned to help avatar creators:
 
-## 🚇 Migrating Assets Package
-Full details at [Converting Assets to a VPM Package](https://vcc.docs.vrchat.com/guides/convert-unitypackage)
+- inspect VRChat avatars inside Unity;
+- connect symptoms to probable root causes using verifiable evidence;
+- explain detected problems, affected objects, risks, and possible repairs;
+- apply only safe, reversible changes with preview, Undo, backup, or rollback;
+- prepare non-destructive Quest variants and compare PC and Quest behavior;
+- validate and publish both platforms under the same Avatar ID; and
+- later use a separate local mobile interface for VRChat OSC controls.
 
-## ✏️ Working on Your Package
+These capabilities are roadmap goals, not features available in version `0.0.1`.
 
-* Delete the "Packages/com.vrchat.demo-template" directory or reuse it for your own package.
-  * If you reuse the package, don't forget to rename it and add generated meta files to your repository!
-* Update the `.gitignore` file in the "Packages" directory to include your package.
-  * For example, change `!com.vrchat.demo-template` to `!com.username.package-name`.
-  * `.gitignore` files normally *exclude* the contents of your "Packages" directory. This `.gitignore` in this template show how to *include* the demo package. You can easily change this out for your own package name.
-* Open the Unity project and work on your package's files in your favorite code editor.
-* When you're ready, commit and push your changes.
-* Once you've set up the automation as described below, you can easily publish new versions.
+## Core principles
 
-## 🤖 Setting up the Automation
+- **Local first:** avatar analysis and project modification will run only on the computer where Unity is open.
+- **Explainable by design:** diagnostics will come from a deterministic expert system and objective evidence, not invented confidence values.
+- **Safe changes:** ambiguous repairs will never be applied automatically, and original third-party assets will be preserved whenever a copy can be used.
+- **Mandatory cost of USD 0:** the project and its required operation must remain free of charge.
+- **No paid AI APIs:** generative AI services are not a runtime dependency or part of the diagnostic engine.
+- **No required servers:** the project will not require project-owned hosting, databases, SaaS accounts, or remote telemetry.
+- **Unity-only project work:** inspection, diagnosis, repair, conversion, building, and publishing will happen exclusively on the PC running Unity.
 
-Create a repository variable with the name and value described below.
-For details on how to create repository variables, see [Creating Configuration Variables for a Repository](https://docs.github.com/en/actions/learn-github-actions/variables#creating-configuration-variables-for-a-repository).
-Make sure you are creating a **repository variable**, and not a **repository secret**.
+## Scope boundaries
 
-* `PACKAGE_NAME`: the name of your package, like `com.vrchat.demo-template`.
+The future **Avatar Remote** is a separate local companion limited to controlling the active VRChat avatar through OSC. It will not read or modify Unity projects, create toggles, run builds, publish avatars, change project materials, or execute arbitrary code on the PC.
 
-Finally, go to the "Settings" page for your repo, then choose "Pages", and look for the heading "Build and deployment". Change the "Source" dropdown from "Deploy from a branch" to "GitHub Actions".
+Blender, external rigging, weight painting, modeling, vertex modification, and mesh editing outside Unity are explicitly outside the project scope.
 
-That's it!
-Some other notes:
-* We highly recommend you keep the existing folder structure of this template.
-  * The root of the project should be a Unity project.
-  * Your packages should be in the "Packages" directory.
-  * If you deviate from this folder structure, you'll need to update the paths that assume your package is in the "Packages" directory on lines 24, 38, 41 and 57.
-* If you want to store and generate your web files in a folder other than "Website" in the root, you can change the `listPublicDirectory` item [here in build-listing.yml](.github/workflows/build-listing.yml#L17).
+## Current repository status
 
-## 🎉 Publishing a Release
+Release `v0.0.1` establishes repository identity, VPM package metadata, documentation, licensing, and the controlled development workflow. It does not add a Unity Editor window, assemblies, scanners, rules, diagnostics, repairs, Quest conversion logic, or publishing logic.
 
-You can make a release by running the [Build Release](.github/workflows/release.yml) action. The version specified in your `package.json` file will be used to define the version of the release.
+No distributable ZIP, `.unitypackage`, VPM listing, or GitHub Pages site is available yet. Distribution remains deliberately disabled until `v0.0.5 — Release Pipeline` validates the artifacts, manifest, listing, and publication workflow.
 
-## 📃 Rebuilding the Listing
+Read the complete [project roadmap](docs/ROADMAP.md) and the [controlled release workflow](docs/WORKFLOW.md) before contributing.
 
-Whenever you make a change to a release - manually publishing it, or manually creating, editing or deleting a release, the [Build Repo Listing](.github/workflows/build-listing.yml) action will make a new index of all the releases available, and publish them as a website hosted fore free on [GitHub Pages](https://pages.github.com/). This listing can be used by the VPM to keep your package up to date, and the generated index page can serve as a simple landing page with info for your package. The URL for your package will be in the format `https://username.github.io/repo-name`.
+## Author
 
-## 🏠 Customizing the Landing Page (Optional)
+Avatar Doctor is maintained publicly by **Teyocesu**.
 
-The action which rebuilds the listing also publishes a landing page. The source for this page is in `Website/index.html`. The automation system uses [Scriban](https://github.com/scriban/scriban) to fill in the objects like `{{ this }}` with information from the latest release's manifest, so it will stay up-to-date with the name, id and description that you provide there. You are welcome to modify this page however you want - just use the existing `{{ template.objects }}` to fill in that info wherever you like. The entire contents of your "Website" folder are published to your GitHub Page each time.
+## Disclaimer
 
-## 💻 Technical Stuff
+Avatar Doctor is an independent project and is not affiliated with, endorsed by, or sponsored by VRChat Inc.
 
-You are welcome to make your own changes to the automation process to make it fit your needs, and you can create Pull Requests if you have some changes you think we should adopt. Here's some more info on the included automation:
+## License
 
-### Build Release Action
-[release.yml](/.github/workflows/release.yml)
-
-This is a composite action combining a variety of existing GitHub Actions and some shell commands to create both a .zip of your Package and a .unitypackage. It creates a release which is named for the `version` in the `package.json` file found in your target Package, and publishes the zip, the unitypackage and the package.json file to this release.
-
-### Build Repo Listing
-[build-listing.yml](.github/workflows/build-listing.yml)
-
-This is a composite action which builds a vpm-compatible [Repo Listing](https://vcc.docs.vrchat.com/vpm/repos) based on the releases you've created. In order to find all your releases and combine them into a listing, it checks out [another repository](https://github.com/vrchat-community/package-list-action) which has a [Nuke](https://nuke.build/) project which includes the VPM core lib to have access to its types and methods. This project will be expanded to include more functionality in the future - for now, the action just calls its `BuildRepoListing` target.
+Avatar Doctor is available under the [MIT License](LICENSE). Inherited third-party components retain their own license notices.
