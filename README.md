@@ -39,7 +39,7 @@ Blender, external rigging, weight painting, modeling, vertex modification, and m
 
 Release `v0.0.1` establishes repository identity, VPM package metadata, documentation, licensing, and the controlled development workflow. It does not add a Unity Editor window, assemblies, scanners, rules, diagnostics, repairs, Quest conversion logic, or publishing logic.
 
-Detailed roadmap and workflow documentation is added in the documentation commit for this foundation release.
+Read the complete [project roadmap](docs/ROADMAP.md) and the [controlled release workflow](docs/WORKFLOW.md) before contributing.
 
 ## Author
 

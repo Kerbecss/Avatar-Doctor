@@ -16,7 +16,7 @@ Installation is not yet recommended for production projects.
 - Future Avatar Remote work will be limited to local VRChat OSC control and will not modify Unity projects.
 - Blender, external rigging, weight painting, and mesh editing are outside the project scope.
 
-Detailed roadmap and workflow documentation is added in the documentation commit for this foundation release.
+See the repository [roadmap](../../docs/ROADMAP.md) for the planned release sequence.
 
 ## Author
 
