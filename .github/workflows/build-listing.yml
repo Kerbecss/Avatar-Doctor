@@ -28,6 +28,7 @@ jobs:
   
   # Build the VPM Listing Website and deploy to GitHub Pages
   build-listing:
+    if: github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main'
     name: build-listing
     environment:
       name: github-pages

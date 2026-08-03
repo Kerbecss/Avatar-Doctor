@@ -7,6 +7,7 @@ jobs:
 
   # Validate Repository Configuration
   config:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     outputs:
       config_package: ${{ steps.config_package.outputs.configPackage }}
