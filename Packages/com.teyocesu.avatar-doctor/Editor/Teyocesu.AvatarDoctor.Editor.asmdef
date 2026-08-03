@@ -1,0 +1,16 @@
+{
+  "name": "Teyocesu.AvatarDoctor.Editor",
+  "rootNamespace": "Teyocesu.AvatarDoctor.Editor",
+  "references": [],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}
