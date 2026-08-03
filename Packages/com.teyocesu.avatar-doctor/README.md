@@ -4,9 +4,11 @@ Avatar Doctor is a planned local-first Unity Editor package for explainable VRCh
 
 ## Status
 
-Avatar Doctor is **pre-alpha**. Version `0.0.1` establishes the repository and package metadata only. It does not contain a functional scanner, diagnostic engine, repair tool, Unity Editor window, Quest converter, or publishing system.
+Avatar Doctor is **pre-alpha**. Version `0.0.2` provides one Editor-only assembly named `Teyocesu.AvatarDoctor.Editor`, a stable root namespace, the initial `Editor/Core` source folder, and internal constants for package identity and version.
 
-Version `0.0.1` is not installable through VCC. Its manifest does not yet point to a distributable ZIP, and no VPM listing or GitHub Pages site is enabled. Artifact and distribution validation belongs to `v0.0.5 — Release Pipeline`.
+It does not contain a Unity Editor window, menus, avatar discovery, avatar analysis, a scanner, diagnostics, repairs, VRChat SDK integration, Quest conversion, publishing, a runtime assembly, or a public API.
+
+Version `0.0.2` is not recommended for production projects and is not installable through VCC. Its manifest does not yet point to a distributable ZIP, and no VPM listing or GitHub Pages site is enabled. Artifact and distribution validation belongs to `v0.0.5 — Release Pipeline`.
 
 ## Principles
 
