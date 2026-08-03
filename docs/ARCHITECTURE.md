@@ -2,7 +2,28 @@
 
 ## Status
 
-This document describes the intended architecture of Avatar Doctor. In version `0.0.1`, the functional modules below are **not implemented**. The repository currently provides only project foundation, VPM package metadata, documentation, licensing, and inherited template automation.
+This document describes the intended architecture of Avatar Doctor. Version `0.0.2` implements only a minimal Editor-only package skeleton. All functional modules described below remain **not implemented**.
+
+## Current implementation state
+
+### Implemented in v0.0.2
+
+- One Editor-only assembly: `Teyocesu.AvatarDoctor.Editor`.
+- Stable root namespace: `Teyocesu.AvatarDoctor.Editor`.
+- Internal package identity constants.
+- Initial `Editor/Core` source folder.
+
+### Not implemented
+
+- Editor window.
+- Avatar discovery.
+- Scanner.
+- Diagnostics.
+- Repairs.
+- VRChat SDK integration.
+- Quest conversion.
+- Publishing.
+- Avatar Remote.
 
 ## System boundary
 
@@ -18,20 +39,23 @@ External Blender workflows are outside the system boundary. The package may iden
 Avatar-Doctor/
 ├── Packages/
 │   └── com.teyocesu.avatar-doctor/
-│       ├── Editor/                 # Future, starting after v0.0.1
-│       │   ├── UI/
-│       │   ├── Scanning/
-│       │   ├── Diagnostics/
-│       │   ├── Rules/
-│       │   ├── Correlation/
-│       │   ├── Repairs/
-│       │   ├── Quest/
-│       │   ├── Publishing/
-│       │   └── Integrations/
-│       ├── Tests/                  # Future
+│       ├── Editor/
+│       │   ├── Teyocesu.AvatarDoctor.Editor.asmdef  # Implemented in v0.0.2
+│       │   ├── Core/                                # Initial skeleton in v0.0.2
+│       │   │   └── AvatarDoctorPackageInfo.cs
+│       │   ├── UI/                                  # Future
+│       │   ├── Scanning/                            # Future
+│       │   ├── Diagnostics/                         # Future
+│       │   ├── Rules/                               # Future
+│       │   ├── Correlation/                         # Future
+│       │   ├── Repairs/                             # Future
+│       │   ├── Quest/                               # Future
+│       │   ├── Publishing/                          # Future
+│       │   └── Integrations/                        # Future
+│       ├── Tests/                                   # Future
 │       │   ├── Editor/
 │       │   └── Fixtures/
-│       └── Documentation~/         # Future package documentation
+│       └── Documentation~/                          # Future package documentation
 ├── AvatarRemote/                   # Future, separate subsystem
 │   ├── Bridge/
 │   └── Pwa/
@@ -56,7 +80,7 @@ The Unity package is expected to keep analysis separate from mutation:
 8. **UI** will present results and navigation while remaining decoupled from the rule engine.
 9. **Integrations** will expose optional adapters for installed third-party tools without modifying their generated outputs or redistributing their assets.
 
-None of these layers exists in `v0.0.1`.
+None of these functional layers is implemented in `v0.0.2`; the current Editor-only assembly contains only the internal package information class described above.
 
 ## Deterministic expert system
 
@@ -98,7 +122,7 @@ The two subsystems may share documented data contracts in the future, but Avatar
 
 ## VPM packaging
 
-Avatar Doctor is expected to remain installable through VPM and VRChat Creator Companion. The package root is:
+Avatar Doctor is planned to become installable through VPM and VRChat Creator Companion after its distribution pipeline is validated. Version `v0.0.2` is not installable through VCC. The package root is:
 
 ```text
 Packages/com.teyocesu.avatar-doctor/
@@ -110,7 +134,7 @@ Release artifacts are planned to include the package manifest, a package archive
 
 The following decisions remain open and must be resolved in their authorized releases:
 
-- assembly boundaries and namespace layout;
+- future assembly boundaries and namespace organization below the stable `Teyocesu.AvatarDoctor.Editor` root;
 - immutable snapshot data structures;
 - rule registration and result schemas;
 - evidence graph representation and confidence formula;
