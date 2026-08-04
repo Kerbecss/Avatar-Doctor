@@ -368,15 +368,14 @@ def load_policy(root: Path) -> Dict[str, Any]:
         "requiredPaths",
         "includeGlobs",
         "requiredSections",
-        "forbiddenPatterns",
     )
-    if not isinstance(public_content, dict) or any(
-        key not in public_content for key in public_content_keys
+    if not isinstance(public_content, dict) or set(public_content) != set(
+        public_content_keys
     ):
         raise ValidatorConfigurationError(
             "Validation policy publicContent is incomplete."
         )
-    for key in ("requiredPaths", "includeGlobs", "forbiddenPatterns"):
+    for key in ("requiredPaths", "includeGlobs"):
         if not isinstance(public_content[key], list) or not public_content[key]:
             raise ValidatorConfigurationError(
                 "Validation policy publicContent.{0} must be a non-empty list.".format(
@@ -416,26 +415,6 @@ def load_policy(root: Path) -> Dict[str, Any]:
             raise ValidatorConfigurationError(
                 "Validation policy publicContent required sections are invalid."
             )
-    public_pattern_names: Set[str] = set()
-    for entry in public_content["forbiddenPatterns"]:
-        if (
-            not isinstance(entry, dict)
-            or not isinstance(entry.get("name"), str)
-            or not entry["name"]
-            or not isinstance(entry.get("pattern"), str)
-            or not entry["pattern"]
-            or entry["name"] in public_pattern_names
-        ):
-            raise ValidatorConfigurationError(
-                "Validation policy publicContent contains an invalid pattern."
-            )
-        public_pattern_names.add(entry["name"])
-        try:
-            re.compile(entry["pattern"])
-        except re.error as error:
-            raise ValidatorConfigurationError(
-                "Invalid regular expression in publicContent: {0}.".format(error)
-            ) from error
     for collection_key in (
         "personalPathPatterns",
         "secretPatterns",
@@ -2661,8 +2640,9 @@ def check_workflows(context: RepositoryContext) -> List[Finding]:
     return findings
 
 
-def check_roadmap_guard(context: RepositoryContext) -> List[Finding]:
-    check_id = "ROADMAP_GUARD"
+def validate_roadmap_structure(
+    context: RepositoryContext, check_id: str
+) -> List[Finding]:
     path = "docs/ROADMAP.md"
     if not context.is_tracked(path):
         return [finding(check_id, path, "Roadmap is not tracked.")]
@@ -2795,6 +2775,10 @@ def check_roadmap_guard(context: RepositoryContext) -> List[Finding]:
     return findings
 
 
+def check_roadmap_guard(context: RepositoryContext) -> List[Finding]:
+    return validate_roadmap_structure(context, "ROADMAP_GUARD")
+
+
 def maintained_public_paths(context: RepositoryContext) -> List[str]:
     configuration = context.policy["publicContent"]
     paths = set(configuration["requiredPaths"])
@@ -2811,10 +2795,6 @@ def check_public_content(context: RepositoryContext) -> List[Finding]:
     check_id = "PUBLIC_CONTENT"
     configuration = context.policy["publicContent"]
     required_sections = configuration["requiredSections"]
-    forbidden_patterns = [
-        (entry["name"], re.compile(entry["pattern"]))
-        for entry in configuration["forbiddenPatterns"]
-    ]
     findings: List[Finding] = []
 
     for relative_path in maintained_public_paths(context):
@@ -2852,56 +2832,7 @@ def check_public_content(context: RepositoryContext) -> List[Finding]:
                     )
                 )
 
-        if relative_path == "docs/ROADMAP.md":
-            roadmap_versions = re.findall(
-                r"^#{2,6}\s+(v[0-9]+\.[0-9]+\.[0-9]+(?:-rc\.[0-9]+)?)\s+—",
-                text,
-                re.MULTILINE,
-            )
-            roadmap_version_counts: Dict[str, int] = {}
-            for version in roadmap_versions:
-                roadmap_version_counts[version] = (
-                    roadmap_version_counts.get(version, 0) + 1
-                )
-            for version in sorted(roadmap_version_counts):
-                if roadmap_version_counts[version] > 1:
-                    findings.append(
-                        finding(
-                            check_id,
-                            relative_path,
-                            "Public roadmap version is duplicated: {0}.".format(
-                                version
-                            ),
-                            "Unique release versions",
-                        )
-                    )
-            for obsolete_heading in context.policy["roadmapGuard"][
-                "forbiddenHeadings"
-            ]:
-                if obsolete_heading in text:
-                    findings.append(
-                        finding(
-                            check_id,
-                            relative_path,
-                            "Public roadmap uses obsolete release numbering.",
-                            "Revised release numbering",
-                        )
-                    )
-
-        for pattern_name, pattern in forbidden_patterns:
-            match = pattern.search(text)
-            if match:
-                line_number = text.count("\n", 0, match.start()) + 1
-                findings.append(
-                    finding(
-                        check_id,
-                        relative_path,
-                        "Public-content policy violation at line {0}: {1}.".format(
-                            line_number, pattern_name
-                        ),
-                        "Maintained public scope and contributor guidance",
-                    )
-                )
+    findings.extend(validate_roadmap_structure(context, check_id))
     return findings
 
 

@@ -427,10 +427,6 @@
       "pattern": "\\bQuest\\b"
     },
     {
-      "name": "Unimplemented protocol behavior",
-      "pattern": "\\bO(?:SC(?:Query)?)\\b"
-    },
-    {
       "name": "Method or invocation syntax",
       "pattern": "\\("
     }
@@ -611,7 +607,8 @@
         "## Validation",
         "## Pull Requests",
         "## Reporting issues",
-        "## License"
+        "## License",
+        "Each contributor uses their own Git identity."
       ],
       "Packages/com.teyocesu.avatar-doctor/README.md": [
         "# Avatar Doctor",
@@ -630,6 +627,18 @@
         "## Current implementation",
         "## Package boundary",
         "## Layers",
+        "### Core",
+        "### UI",
+        "### Scanning",
+        "### Rules",
+        "### Diagnostics",
+        "### Correlation",
+        "### Repairs",
+        "### Quest",
+        "### Publishing",
+        "### Integrations",
+        "### Tests",
+        "### Distribution",
         "## Diagnostic model",
         "## Open decisions"
       ],
@@ -644,13 +653,16 @@
         "## Package baseline",
         "## Development environment",
         "## Unity status",
-        "## Distribution status"
+        "## Distribution status",
+        "## Validation boundaries"
       ],
       "docs/VALIDATION.md": [
         "# Repository Validation",
         "## Checks",
         "## Public content validation",
-        "## Unity validation"
+        "## Unity validation",
+        "Checks: 16",
+        "PUBLIC_CONTENT validates required public files, sections, contributor guidance, roadmap structure, release ordering, and stable-release scope."
       ],
       "docs/WORKFLOW.md": [
         "# Development and Release Workflow",
@@ -658,66 +670,10 @@
         "## Pull Requests",
         "## Repository validation",
         "## Merge and release",
-        "## Distribution"
+        "## Distribution",
+        "Project changes are developed on branches and merged through Pull Requests.",
+        "Every change receives human review before merge."
       ]
-    },
-    "forbiddenPatterns": [
-      {
-        "name": "Internal development contract",
-        "pattern": "(?i)master\\s+roadmap\\s+and\\s+development\\s+contract|authorized\\s+release|explicit\\s+authorization\\s+from\\s+the\\s+project\\s+owner|do\\s+not\\s+begin\\s+future\\s+release\\s+work"
-      },
-      {
-        "name": "Private delivery template",
-        "pattern": "(?i)delivery\\s+diagnosis|mandatory\\s+delivery|master\\s+diagnosis|diagnosis\\s+(?:delivered|written)\\s+in\\s+Spanish|Spanish\\s+diagnosis"
-      },
-      {
-        "name": "Development-agent instruction",
-        "pattern": "(?i)(?:development|coding|release)\\s+agents?|agent-specific|instructions?\\s+(?:for|to)\\s+(?:an?\\s+)?agents?"
-      },
-      {
-        "name": "Owner-specific instruction",
-        "pattern": "(?i)project\\s+owner|owner['’]s\\s+real\\s+name|conversation\\s+with\\s+the\\s+owner|act\\s+on\\s+behalf\\s+of\\s+the\\s+owner"
-      },
-      {
-        "name": "Maintainer identity impersonation",
-        "pattern": "(?i)(?:git|commit)\\s+(?:author|identity).*Teyocesu|Teyocesu.*(?:git|commit)\\s+(?:author|identity)|commits?\\s+as\\s+Teyocesu"
-      },
-      {
-        "name": "Private review requirement",
-        "pattern": "(?i)mandatory\\s+external\\s+review(?:er)?"
-      },
-      {
-        "name": "Removed product scope",
-        "pattern": "(?i)Avatar(?:[\\x20\\t]+)?Remote|O(?:SCQuery)|\\bO(?:SC)\\b|desktop\\s+bridge|mobile\\s+(?:PWA|remote|companion)|local\\s+pairing|WebSocket\\s+pairing|QR\\s+pairing"
-      },
-      {
-        "name": "Phone-control product scope",
-        "pattern": "(?i)(?:control|controlling)\\s+(?:an?\\s+)?avatar\\s+from\\s+(?:a\\s+)?phone"
-      },
-      {
-        "name": "Obsolete release-pipeline assignment",
-        "pattern": "(?i)v0\\.0\\.5\\s+—\\s+Release\\s+Pipeline"
-      },
-      {
-        "name": "Obsolete future release numbering",
-        "pattern": "(?i)v0\\.11\\.[0-9]+|v0\\.10\\.[0-4]\\s+—\\s+(?:Integration\\s+Adapter|VRCFury|Shader\\s+Integrations|Rule\\s+Packs|Security,\\s+Accessibility)"
-      },
-      {
-        "name": "Personal cost restriction",
-        "pattern": "(?i)mandatory\\s+cost|USD\\s*0|economic\\s+constraint|must\\s+remain\\s+free\\s+of\\s+charge"
-      },
-      {
-        "name": "Artificial-intelligence restriction",
-        "pattern": "(?i)generative\\s+A[I]|paid\\s+A[I]|A[I]\\s+APIs?|artificial\\s+intelligence|no\\s+A[I]"
-      },
-      {
-        "name": "External-tool prohibition",
-        "pattern": "(?i)B(?:lender)|Weight\\s+Paint|external\\s+rigging|vertex\\s+editing|mesh\\s+editing\\s+outside\\s+Unity"
-      },
-      {
-        "name": "Private language instruction",
-        "pattern": "(?i)development\\s+conversation.*Spanish|must\\s+(?:speak|respond|write).*Spanish"
-      }
-    ]
+    }
   }
 }

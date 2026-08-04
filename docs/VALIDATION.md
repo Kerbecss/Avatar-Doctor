@@ -53,7 +53,7 @@ The `--root` value must identify the Git repository root. Without it, the valida
 - `PROHIBITED_FILES` rejects generated files, operating-system clutter, and archives.
 - `WORKFLOWS` protects distribution gates and the read-only validation workflow.
 - `ROADMAP_GUARD` validates the public roadmap release order, headings, and unique versions.
-- `PUBLIC_CONTENT` validates maintained public documentation and the active package scope.
+- `PUBLIC_CONTENT` validates required public files, sections, contributor guidance, roadmap structure, release ordering, and stable-release scope.
 
 ## Success output
 
@@ -82,11 +82,11 @@ Unexpected execution or policy-loading failures return exit code `2`.
 
 ## Public content validation
 
-`PUBLIC_CONTENT` scans the root README, contribution guide, package README and changelog, documentation Markdown, GitHub Markdown templates, and maintained Website text files. It protects the public documentation structure, current product scope, roadmap numbering, and contributor identity guidance.
+PUBLIC_CONTENT validates required public files, sections, contributor guidance, roadmap structure, release ordering, and stable-release scope. It reads the root README, contribution guide, package README and changelog, documentation Markdown, GitHub Markdown templates, and maintained Website text files as UTF-8. The check also verifies the exact roadmap stages, release sequence, and stable-release capabilities.
 
 The check does not inspect Git history, historical Releases, closed Pull Requests, closed Issues, third-party licenses, binaries, temporary logs, or inherited third-party packages.
 
-Public-content policy is intentionally narrow. Positive technical language such as `rule-based diagnostics`, `deterministic evidence`, `maintainer review`, `privacy`, `secrets`, `MIT License`, and `VPM/VCC` is supported.
+Public-content validation is structural and positive. Human review remains responsible for meaning, accuracy, and scope beyond these deterministic requirements.
 
 ## Privacy and security
 
