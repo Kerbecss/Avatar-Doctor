@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "packageRoot": "Packages/com.teyocesu.avatar-doctor",
-  "expectedVersion": "0.0.4",
-  "previousVersion": "0.0.3",
+  "expectedVersion": "0.0.5",
+  "previousVersion": "0.0.4",
   "expectedIdentity": {
     "packageId": "com.teyocesu.avatar-doctor",
     "displayName": "Avatar Doctor",
@@ -17,6 +17,7 @@
   },
   "requiredRootFiles": [
     ".github/workflows/validate.yml",
+    "CONTRIBUTING.md",
     "LICENSE",
     "README.md",
     "ci/validate_repository.py",
@@ -176,7 +177,7 @@
       "pattern": "(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})"
     },
     {
-      "name": "OpenAI-style secret key",
+      "name": "Generic API secret key",
       "pattern": "sk-[A-Za-z0-9_-]{20,}"
     },
     {
@@ -426,8 +427,8 @@
       "pattern": "\\bQuest\\b"
     },
     {
-      "name": "OSC behavior",
-      "pattern": "\\bOSC(?:Query)?\\b"
+      "name": "Unimplemented protocol behavior",
+      "pattern": "\\bO(?:SC(?:Query)?)\\b"
     },
     {
       "name": "Method or invocation syntax",
@@ -466,20 +467,257 @@
     }
   },
   "roadmapGuard": {
-    "requiredReleases": [
-      "v0.0.1",
-      "v0.0.2",
-      "v0.0.3",
-      "v0.0.4",
-      "v0.0.5",
-      "v0.1.0",
-      "v1.0.0"
+    "requiredStages": [
+      "Stage A — Foundation",
+      "Stage B — Avatar Scanner",
+      "Stage C — Structural Diagnostics",
+      "Stage D — Menus, Parameters, and Animators",
+      "Stage E — Repair Engine",
+      "Stage F — Materials, Dynamics, and Performance",
+      "Stage G — Explainable Intelligence",
+      "Stage H — Quest Preparation and Conversion",
+      "Stage I — Multi-Platform Comparison and Publishing",
+      "Stage J — Ecosystem and Stabilization",
+      "Stage K — Beta and Stable Release"
     ],
-    "requiredBoundaries": [
-      "All inspection, diagnosis, repair, PC/Quest conversion, and publishing occurs exclusively on the PC where Unity is open.",
-      "# Stage J — Avatar Remote",
-      "Blender, Weight Paint, modeling, external rigging, vertex modification, and mesh editing outside Unity are not part of the project.",
-      "Mandatory USD 0 cost."
+    "orderedReleaseHeadings": [
+      "v0.0.1 — Repository Foundation",
+      "v0.0.2 — Package Skeleton",
+      "v0.0.3 — Repository Validation",
+      "v0.0.4 — Editor Window Shell",
+      "v0.0.5 — Public Documentation Cleanup",
+      "v0.0.6 — Release Pipeline",
+      "v0.1.0 — Avatar Discovery",
+      "v0.1.1 — Hierarchy Snapshot",
+      "v0.1.2 — Component and Asset Inventory",
+      "v0.1.3 — Reference Graph",
+      "v0.1.4 — Results Interface and Export",
+      "v0.2.0 — Descriptor Diagnostics",
+      "v0.2.1 — Rig and Animator Diagnostics",
+      "v0.2.2 — Missing and External References",
+      "v0.2.3 — Renderer and Root Bone Diagnostics",
+      "v0.2.4 — Bone Mapping Diagnostics",
+      "v0.2.5 — Mesh and Blendshape Diagnostics",
+      "v0.3.0 — Expression Inventory",
+      "v0.3.1 — Parameter Diagnostics",
+      "v0.3.2 — Menu Diagnostics",
+      "v0.3.3 — Animator Graph Extraction",
+      "v0.3.4 — Animator Flow Diagnostics",
+      "v0.3.5 — Animation Binding Diagnostics",
+      "v0.4.0 — Repair Transactions",
+      "v0.4.1 — Safe Reference Repairs",
+      "v0.4.2 — Root Bone and Bone Remapping",
+      "v0.4.3 — Expressions Repairs",
+      "v0.4.4 — Animation Repairs",
+      "v0.4.5 — Safe Toggle Builder and Rollback",
+      "v0.5.0 — Material and Shader Inspection",
+      "v0.5.1 — Animated Shader Properties",
+      "v0.5.2 — Texture Audit",
+      "v0.5.3 — PhysBones and Contacts",
+      "v0.5.4 — Constraints and Performance",
+      "v0.6.0 — Evidence Graph",
+      "v0.6.1 — Root Cause Correlation",
+      "v0.6.2 — Confidence Scoring",
+      "v0.6.3 — Repair Planning",
+      "v0.6.4 — Scenario Library",
+      "v0.7.0 — Quest Environment Readiness",
+      "v0.7.1 — Quest Compatibility Report",
+      "v0.7.2 — Non-Destructive Quest Variant",
+      "v0.7.3 — Shader and Material Conversion",
+      "v0.7.4 — Texture and Component Conversion Plan",
+      "v0.7.5 — Quest Priority Profiles",
+      "v0.7.6 — Dynamic Quest Budget",
+      "v0.7.7 — Quest Conversion Execution",
+      "v0.8.0 — PC and Quest Functional Parity",
+      "v0.8.1 — Local Visual Comparison",
+      "v0.8.2 — Build Guardian",
+      "v0.8.3 — Build and Test",
+      "v0.8.4 — Multi-Platform Publisher",
+      "v0.9.0 — Integration Adapter API",
+      "v0.9.1 — VRCFury and Modular Avatar Awareness",
+      "v0.9.2 — Shader Integrations",
+      "v0.9.3 — Rule Packs and Compatibility Matrix",
+      "v0.9.4 — Security, Accessibility and Documentation",
+      "v0.10.0 — Public Beta",
+      "v0.10.1 — Beta Reliability",
+      "v0.10.2 — Beta Performance",
+      "v0.10.3 — Release Candidate Preparation",
+      "v1.0.0-rc.1 — First Release Candidate",
+      "v1.0.0-rc.2 — Final Release Candidate",
+      "v1.0.0 — Stable Release"
+    ],
+    "forbiddenHeadings": [
+      "v0.0.5 — Release Pipeline",
+      "v0.10.0 — Integration Adapter API",
+      "v0.10.1 — VRCFury and Modular Avatar Awareness",
+      "v0.10.2 — Shader Integrations",
+      "v0.10.3 — Rule Packs and Compatibility Matrix",
+      "v0.10.4 — Security, Accessibility and Documentation",
+      "v0.11.0 — Public Beta",
+      "v0.11.1 — Beta Reliability",
+      "v0.11.2 — Beta Performance",
+      "v0.11.3 — Release Candidate Preparation"
+    ],
+    "requiredStableCapabilities": [
+      "Explainable diagnostics.",
+      "Safe repairs.",
+      "Quest conversion.",
+      "PC and Quest comparison.",
+      "Multi-platform publishing assistance.",
+      "VPM installation.",
+      "Complete user and contributor documentation."
+    ]
+  },
+  "publicContent": {
+    "requiredPaths": [
+      "README.md",
+      "CONTRIBUTING.md",
+      "Packages/com.teyocesu.avatar-doctor/README.md",
+      "Packages/com.teyocesu.avatar-doctor/CHANGELOG.md",
+      "docs/ARCHITECTURE.md",
+      "docs/ROADMAP.md",
+      "docs/TECHNICAL_BASELINE.md",
+      "docs/VALIDATION.md",
+      "docs/WORKFLOW.md"
+    ],
+    "includeGlobs": [
+      "docs/*.md",
+      "docs/**/*.md",
+      ".github/*.md",
+      ".github/**/*.md",
+      "Website/*.html",
+      "Website/*.js",
+      "Website/*.css"
+    ],
+    "requiredSections": {
+      "README.md": [
+        "# Avatar Doctor",
+        "## Status",
+        "## Planned capabilities",
+        "## Current functionality",
+        "## Contributing",
+        "## Documentation",
+        "## Author",
+        "## Disclaimer",
+        "## License"
+      ],
+      "CONTRIBUTING.md": [
+        "# Contributing to Avatar Doctor",
+        "## Project status",
+        "## Development requirements",
+        "## Getting started",
+        "## Branches",
+        "## Commits",
+        "## Validation",
+        "## Pull Requests",
+        "## Reporting issues",
+        "## License"
+      ],
+      "Packages/com.teyocesu.avatar-doctor/README.md": [
+        "# Avatar Doctor",
+        "## Status",
+        "## Requirements",
+        "## Documentation",
+        "## Author",
+        "## Disclaimer",
+        "## License"
+      ],
+      "Packages/com.teyocesu.avatar-doctor/CHANGELOG.md": [
+        "## [0.0.5] - 2026-08-04"
+      ],
+      "docs/ARCHITECTURE.md": [
+        "# Avatar Doctor Architecture",
+        "## Current implementation",
+        "## Package boundary",
+        "## Layers",
+        "## Diagnostic model",
+        "## Open decisions"
+      ],
+      "docs/ROADMAP.md": [
+        "# Avatar Doctor Roadmap",
+        "## Current status",
+        "## Released foundation",
+        "## Planned releases"
+      ],
+      "docs/TECHNICAL_BASELINE.md": [
+        "# Technical Baseline",
+        "## Package baseline",
+        "## Development environment",
+        "## Unity status",
+        "## Distribution status"
+      ],
+      "docs/VALIDATION.md": [
+        "# Repository Validation",
+        "## Checks",
+        "## Public content validation",
+        "## Unity validation"
+      ],
+      "docs/WORKFLOW.md": [
+        "# Development and Release Workflow",
+        "## Branches",
+        "## Pull Requests",
+        "## Repository validation",
+        "## Merge and release",
+        "## Distribution"
+      ]
+    },
+    "forbiddenPatterns": [
+      {
+        "name": "Internal development contract",
+        "pattern": "(?i)master\\s+roadmap\\s+and\\s+development\\s+contract|authorized\\s+release|explicit\\s+authorization\\s+from\\s+the\\s+project\\s+owner|do\\s+not\\s+begin\\s+future\\s+release\\s+work"
+      },
+      {
+        "name": "Private delivery template",
+        "pattern": "(?i)delivery\\s+diagnosis|mandatory\\s+delivery|master\\s+diagnosis|diagnosis\\s+(?:delivered|written)\\s+in\\s+Spanish|Spanish\\s+diagnosis"
+      },
+      {
+        "name": "Development-agent instruction",
+        "pattern": "(?i)(?:development|coding|release)\\s+agents?|agent-specific|instructions?\\s+(?:for|to)\\s+(?:an?\\s+)?agents?"
+      },
+      {
+        "name": "Owner-specific instruction",
+        "pattern": "(?i)project\\s+owner|owner['’]s\\s+real\\s+name|conversation\\s+with\\s+the\\s+owner|act\\s+on\\s+behalf\\s+of\\s+the\\s+owner"
+      },
+      {
+        "name": "Maintainer identity impersonation",
+        "pattern": "(?i)(?:git|commit)\\s+(?:author|identity).*Teyocesu|Teyocesu.*(?:git|commit)\\s+(?:author|identity)|commits?\\s+as\\s+Teyocesu"
+      },
+      {
+        "name": "Private review requirement",
+        "pattern": "(?i)mandatory\\s+external\\s+review(?:er)?"
+      },
+      {
+        "name": "Removed product scope",
+        "pattern": "(?i)Avatar(?:[\\x20\\t]+)?Remote|O(?:SCQuery)|\\bO(?:SC)\\b|desktop\\s+bridge|mobile\\s+(?:PWA|remote|companion)|local\\s+pairing|WebSocket\\s+pairing|QR\\s+pairing"
+      },
+      {
+        "name": "Phone-control product scope",
+        "pattern": "(?i)(?:control|controlling)\\s+(?:an?\\s+)?avatar\\s+from\\s+(?:a\\s+)?phone"
+      },
+      {
+        "name": "Obsolete release-pipeline assignment",
+        "pattern": "(?i)v0\\.0\\.5\\s+—\\s+Release\\s+Pipeline"
+      },
+      {
+        "name": "Obsolete future release numbering",
+        "pattern": "(?i)v0\\.11\\.[0-9]+|v0\\.10\\.[0-4]\\s+—\\s+(?:Integration\\s+Adapter|VRCFury|Shader\\s+Integrations|Rule\\s+Packs|Security,\\s+Accessibility)"
+      },
+      {
+        "name": "Personal cost restriction",
+        "pattern": "(?i)mandatory\\s+cost|USD\\s*0|economic\\s+constraint|must\\s+remain\\s+free\\s+of\\s+charge"
+      },
+      {
+        "name": "Artificial-intelligence restriction",
+        "pattern": "(?i)generative\\s+A[I]|paid\\s+A[I]|A[I]\\s+APIs?|artificial\\s+intelligence|no\\s+A[I]"
+      },
+      {
+        "name": "External-tool prohibition",
+        "pattern": "(?i)B(?:lender)|Weight\\s+Paint|external\\s+rigging|vertex\\s+editing|mesh\\s+editing\\s+outside\\s+Unity"
+      },
+      {
+        "name": "Private language instruction",
+        "pattern": "(?i)development\\s+conversation.*Spanish|must\\s+(?:speak|respond|write).*Spanish"
+      }
     ]
   }
 }
