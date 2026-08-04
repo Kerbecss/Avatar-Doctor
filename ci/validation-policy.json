@@ -1,0 +1,426 @@
+{
+  "schemaVersion": 1,
+  "packageRoot": "Packages/com.teyocesu.avatar-doctor",
+  "expectedVersion": "0.0.3",
+  "previousVersion": "0.0.2",
+  "expectedIdentity": {
+    "packageId": "com.teyocesu.avatar-doctor",
+    "displayName": "Avatar Doctor",
+    "author": "Teyocesu",
+    "authorEmail": "80324652+Teyocesu@users.noreply.github.com",
+    "authorUrl": "https://github.com/Teyocesu",
+    "repository": "Teyocesu/Avatar-Doctor",
+    "repositoryUrl": "https://github.com/Teyocesu/Avatar-Doctor",
+    "rootNamespace": "Teyocesu.AvatarDoctor.Editor",
+    "unity": "2022.3",
+    "license": "MIT"
+  },
+  "requiredRootFiles": [
+    ".github/workflows/validate.yml",
+    "LICENSE",
+    "README.md",
+    "ci/validate_repository.py",
+    "ci/validation-policy.json",
+    "docs/ARCHITECTURE.md",
+    "docs/ROADMAP.md",
+    "docs/TECHNICAL_BASELINE.md",
+    "docs/VALIDATION.md",
+    "docs/WORKFLOW.md"
+  ],
+  "requiredPackageFiles": [
+    "CHANGELOG.md",
+    "Editor/Core/AvatarDoctorPackageInfo.cs",
+    "Editor/Teyocesu.AvatarDoctor.Editor.asmdef",
+    "LICENSE.md",
+    "README.md",
+    "package.json"
+  ],
+  "allowedAssemblyDefinitions": [
+    {
+      "path": "Packages/com.teyocesu.avatar-doctor/Editor/Teyocesu.AvatarDoctor.Editor.asmdef",
+      "name": "Teyocesu.AvatarDoctor.Editor",
+      "rootNamespace": "Teyocesu.AvatarDoctor.Editor",
+      "includePlatforms": [
+        "Editor"
+      ]
+    }
+  ],
+  "allowedNamespaces": [
+    "Teyocesu.AvatarDoctor.Editor"
+  ],
+  "approvedBinaryFiles": [
+    {
+      "path": "Website/favicon.ico",
+      "sha256": "2dfb86d3f4234775f31f0f1a36ddfb79bb2749688ffdbb0547d3cb32ca1c07ae"
+    }
+  ],
+  "forbiddenFilePatterns": [
+    ".DS_Store",
+    ".dockerignore",
+    ".npmrc",
+    ".nvmrc",
+    ".yarnrc",
+    "Thumbs.db",
+    "Dockerfile",
+    "Pipfile",
+    "Pipfile.lock",
+    "desktop.ini",
+    "*.csproj",
+    "*.dockerfile",
+    "*.log",
+    "*.sln",
+    "*.suo",
+    "*.tmp",
+    "*.unitypackage",
+    "*.user",
+    "*.zip",
+    "bun.lock",
+    "bun.lockb",
+    "compose.yaml",
+    "compose.yml",
+    "docker-compose.yaml",
+    "docker-compose.yml",
+    "package-lock.json",
+    "npm-shrinkwrap.json",
+    "pnpm-lock.yaml",
+    "poetry.lock",
+    "pyproject.toml",
+    "requirements*.txt",
+    "setup.cfg",
+    "setup.py",
+    "tox.ini",
+    "tsconfig.json",
+    "uv.lock",
+    "yarn.lock"
+  ],
+  "forbiddenDirectoryNames": [
+    ".devcontainer",
+    ".env",
+    ".idea",
+    ".tox",
+    ".venv",
+    ".virtualenv",
+    ".vs",
+    "Build",
+    "Builds",
+    "env",
+    "Library",
+    "Logs",
+    "MemoryCaptures",
+    "Temp",
+    "UserSettings",
+    "__pycache__",
+    "node_modules",
+    "venv",
+    "obj"
+  ],
+  "forbiddenPaths": [
+    ".github/actions",
+    "package.json"
+  ],
+  "forbiddenPathPrefixes": [
+    ".github/actions/"
+  ],
+  "allowedPackageJsonPaths": [
+    "Packages/com.teyocesu.avatar-doctor/package.json",
+    "Packages/com.vrchat.core.bootstrap/package.json"
+  ],
+  "allowedEmails": [
+    "80324652+Teyocesu@users.noreply.github.com",
+    "developer@vrchat.com"
+  ],
+  "personalPathPatterns": [
+    {
+      "name": "macOS user directory",
+      "pattern": "/Users/[^/\\s]+/"
+    },
+    {
+      "name": "Windows user directory",
+      "pattern": "[A-Za-z]:\\\\Users\\\\[^\\\\\\s]+\\\\"
+    },
+    {
+      "name": "Linux user directory",
+      "pattern": "/home/[^/\\s]+/"
+    },
+    {
+      "name": "Local file URI",
+      "pattern": "file://"
+    }
+  ],
+  "secretPatterns": [
+    {
+      "name": "Private key header",
+      "pattern": "-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----"
+    },
+    {
+      "name": "GitHub personal access token",
+      "pattern": "(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})"
+    },
+    {
+      "name": "OpenAI-style secret key",
+      "pattern": "sk-[A-Za-z0-9_-]{20,}"
+    },
+    {
+      "name": "AWS access key identifier",
+      "pattern": "(?:AKIA|ASIA)[0-9A-Z]{16}"
+    },
+    {
+      "name": "Assigned credential",
+      "pattern": "(?i)(?<![A-Za-z0-9_])[\"']?(?:token|password|passwd|secret)[\"']?\\s*[:=]\\s*(?:[\"'][^\"'\\n]{8,}[\"']|[A-Za-z0-9_./+=-]{8,})"
+    }
+  ],
+  "spanishCharacters": "áéíóúÁÉÍÓÚ¿¡",
+  "spanishMarkers": [
+    "Diagnóstico",
+    "Información",
+    "Objetivo",
+    "Requisitos",
+    "Resumen",
+    "Validación",
+    "Versión"
+  ],
+  "definitionFiles": [
+    "ci/validation-policy.json"
+  ],
+  "legacyTextHygieneExceptions": {
+    ".github/workflows/build-listing.yml": {
+      "sha256": "675d49ec2db0c92d10d81eb2dd1aa57cc1237843e9361fbbb73ea993be8a6b2a",
+      "rules": [
+        "trailingWhitespace"
+      ]
+    },
+    ".github/workflows/release.yml": {
+      "sha256": "21d40af131688d03aebf510c68e6a4d6821cf973190de8304100a2831c6c0648",
+      "rules": [
+        "trailingWhitespace"
+      ]
+    },
+    "Packages/com.vrchat.core.bootstrap/Editor.meta": {
+      "sha256": "97f19978936f58db8663ce7acf381f87df4db6321a88067d86b6bc4e84850621",
+      "rules": [
+        "trailingWhitespace"
+      ]
+    },
+    "Packages/com.vrchat.core.bootstrap/Editor/Bootstrap.cs": {
+      "sha256": "f005cd693d543b503f06d48beb9db443df784cef4a9f02d5ecff26826a68bb31",
+      "rules": [
+        "trailingWhitespace"
+      ]
+    },
+    "Packages/com.vrchat.core.bootstrap/Editor/Bootstrap.cs.meta": {
+      "sha256": "59572c648e50a9d9084a7eb7952c82f52c1a47680c0925e40fb2c67f990a5b7c",
+      "rules": [
+        "trailingWhitespace"
+      ]
+    },
+    "Packages/com.vrchat.core.bootstrap/Editor/VRChat.Bootstrapper.Editor.asmdef": {
+      "sha256": "bdf3892b40a0a7962416eef70251430dd761bb82a0e8f3f0bab884a39c67636b",
+      "rules": [
+        "finalNewline"
+      ]
+    },
+    "Packages/com.vrchat.core.bootstrap/Editor/VRChat.Bootstrapper.Editor.asmdef.meta": {
+      "sha256": "3d96020b47df5d10cb4c193c6412d48aa91666dcb5cb51613bdd1357133b5b83",
+      "rules": [
+        "trailingWhitespace"
+      ]
+    },
+    "Packages/com.vrchat.core.bootstrap/License.md": {
+      "sha256": "0d13d77b47de94d250cca7c41d31c2832edd98c4b55a1ee2b5fd23d4fefdaade",
+      "rules": [
+        "trailingWhitespace",
+        "finalNewline"
+      ]
+    },
+    "Packages/com.vrchat.core.bootstrap/License.md.meta": {
+      "sha256": "f64f3999c49fa65fb48e9463c0dc9e3cdb447be62d3f16ce55992d18456d6692",
+      "rules": [
+        "trailingWhitespace"
+      ]
+    },
+    "Packages/com.vrchat.core.bootstrap/package.json.meta": {
+      "sha256": "4c5e258b3d702121e34affd3cd845877990d92e0af5e07a1ead3e442aeb2fca9",
+      "rules": [
+        "trailingWhitespace"
+      ]
+    },
+    "Packages/vpm-manifest.json": {
+      "sha256": "2e55738d6a00b3341b9bea827ed10ffa4562a727226a810f7c6123df11695514",
+      "rules": [
+        "finalNewline"
+      ]
+    },
+    "ProjectSettings/AudioManager.asset": {
+      "sha256": "f2ed914f70919b6434c647bd820850be731b408f0f0c31e3bf7f98c8cafb617f",
+      "rules": [
+        "trailingWhitespace"
+      ]
+    },
+    "ProjectSettings/EditorSettings.asset": {
+      "sha256": "a7b662e8e7fc62d2e84d07b2aaf868f17b58c023fb041efcdf9aacff6537030a",
+      "rules": [
+        "trailingWhitespace"
+      ]
+    },
+    "ProjectSettings/InputManager.asset": {
+      "sha256": "1fb1c30f8a1615cf9a4220be6d18a33eccd3a09cc4cd0a3c7cd0a38a7c083134",
+      "rules": [
+        "trailingWhitespace"
+      ]
+    },
+    "ProjectSettings/NavMeshAreas.asset": {
+      "sha256": "80106cfa7e6181a1928b142c075f3e510d527441e3d79bc83590e4ac91e7cd66",
+      "rules": [
+        "trailingWhitespace"
+      ]
+    },
+    "ProjectSettings/PackageManagerSettings.asset": {
+      "sha256": "75fa9ef1b32ebf0ed8823c37c2613c19d08471ea3d53e5deb2709cbd55e085ef",
+      "rules": [
+        "trailingWhitespace"
+      ]
+    },
+    "ProjectSettings/ProjectSettings.asset": {
+      "sha256": "298c002a02cd0b7440b507d0df61843e59ca547d51c62e8d1566d4dea91383a1",
+      "rules": [
+        "trailingWhitespace"
+      ]
+    },
+    "ProjectSettings/TagManager.asset": {
+      "sha256": "8e18b1c820e9c09e16bbd1f1b7842e9fb3b0158a0921b0964e0b8fa12c6e2c01",
+      "rules": [
+        "trailingWhitespace"
+      ]
+    },
+    "ProjectSettings/UnityConnectSettings.asset": {
+      "sha256": "1e06370b3d2256d4dbc8892f59a8467d9f9785f034a4836a6790380252eb4916",
+      "rules": [
+        "trailingWhitespace"
+      ]
+    },
+    "ProjectSettings/VFXManager.asset": {
+      "sha256": "f066c6483919961332415ee64204f74fe52f38c02e82892eb02b7a5b2e381f0e",
+      "rules": [
+        "trailingWhitespace"
+      ]
+    },
+    "ProjectSettings/XRSettings.asset": {
+      "sha256": "edd2beb4a2e388312b4b7da241aa51070434005d82c59363f1237dd2e567585f",
+      "rules": [
+        "finalNewline"
+      ]
+    },
+    "Website/app.js": {
+      "sha256": "3bc46109959bddab15dd24d97e2d88b48339fb278190189d24719debea3b91ba",
+      "rules": [
+        "finalNewline"
+      ]
+    },
+    "Website/index.html": {
+      "sha256": "306a8335d10dfe6e07f95a7ace2b537460a5ac413bf8ed36ca7047fe946fa909",
+      "rules": [
+        "trailingWhitespace"
+      ]
+    },
+    "Website/styles.css": {
+      "sha256": "2f0433a27325c804d9c480eb5eb8b91bf677fa5c8f0b65edde88ef8ad33e4230",
+      "rules": [
+        "finalNewline"
+      ]
+    }
+  },
+  "prohibitedCodePatterns": [
+    {
+      "name": "Unity Editor API",
+      "pattern": "\\bUnityEditor\\b"
+    },
+    {
+      "name": "Unity runtime API",
+      "pattern": "\\bUnityEngine\\b"
+    },
+    {
+      "name": "Editor window",
+      "pattern": "\\bEditorWindow\\b"
+    },
+    {
+      "name": "Menu item",
+      "pattern": "\\bMenuItem\\b"
+    },
+    {
+      "name": "File I/O",
+      "pattern": "(?:\\bSystem\\.IO\\b|\\bFile\\s*\\.|\\bDirectory\\s*\\.)"
+    },
+    {
+      "name": "Networking",
+      "pattern": "(?:\\bSystem\\.Net\\b|\\bHttpClient\\b|\\bWebRequest\\b|\\bSocket\\b)"
+    },
+    {
+      "name": "Reflection",
+      "pattern": "(?:\\bSystem\\.Reflection\\b|\\bReflection\\b)"
+    },
+    {
+      "name": "VRChat SDK type",
+      "pattern": "(?:\\bVRCAvatarDescriptor\\b|\\bVRC\\.SDK\\b|\\bPhysBone\\b)"
+    },
+    {
+      "name": "Quest behavior",
+      "pattern": "\\bQuest\\b"
+    },
+    {
+      "name": "OSC behavior",
+      "pattern": "\\bOSC(?:Query)?\\b"
+    },
+    {
+      "name": "Method or invocation syntax",
+      "pattern": "\\("
+    }
+  ],
+  "protectedWorkflows": {
+    "release": {
+      "path": ".github/workflows/release.yml",
+      "sha256": "21d40af131688d03aebf510c68e6a4d6821cf973190de8304100a2831c6c0648",
+      "manualOnly": true,
+      "requiredConditions": [
+        "github.ref == 'refs/heads/main'",
+        "vars.ENABLE_PACKAGE_RELEASE == 'true'"
+      ],
+      "requiredTagTemplate": "v${{ env.version }}"
+    },
+    "listing": {
+      "path": ".github/workflows/build-listing.yml",
+      "sha256": "675d49ec2db0c92d10d81eb2dd1aa57cc1237843e9361fbbb73ea993be8a6b2a",
+      "manualOnly": true,
+      "requiredConditions": [
+        "github.ref == 'refs/heads/main'",
+        "vars.ENABLE_PACKAGE_LISTING == 'true'"
+      ]
+    },
+    "validation": {
+      "path": ".github/workflows/validate.yml",
+      "sha256": "752a8d5b6afe73a1a99449013587851bd3e5b38ce7ec630fbd9b084d63a5561d",
+      "name": "Repository Validation",
+      "job": "validate",
+      "runner": "ubuntu-latest",
+      "timeoutMinutes": 5,
+      "checkout": "actions/checkout@3df4ab11eba7bda6032a0b82a6bb43b11571feac",
+      "command": "python3 ci/validate_repository.py --root ."
+    }
+  },
+  "roadmapGuard": {
+    "requiredReleases": [
+      "v0.0.1",
+      "v0.0.2",
+      "v0.0.3",
+      "v0.0.4",
+      "v0.0.5",
+      "v0.1.0",
+      "v1.0.0"
+    ],
+    "requiredBoundaries": [
+      "All inspection, diagnosis, repair, PC/Quest conversion, and publishing occurs exclusively on the PC where Unity is open.",
+      "# Stage J — Avatar Remote",
+      "Blender, Weight Paint, modeling, external rigging, vertex modification, and mesh editing outside Unity are not part of the project.",
+      "Mandatory USD 0 cost."
+    ]
+  }
+}

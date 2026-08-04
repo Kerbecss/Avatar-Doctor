@@ -87,6 +87,18 @@ The Pull Request must:
 
 An automated or self-authored implementation report is not the external review. The Pull Request must not be marked ready or merged until the project owner explicitly authorizes the next step.
 
+## Repository validation
+
+Every Pull Request must have a successful `Repository Validation / validate` check for its current head before release approval.
+
+Repository validation is a required safeguard, but it does not replace mandatory external review. A successful check does not authorize marking a Pull Request ready, merging it, creating a tag, or publishing a GitHub Release.
+
+Validation failures must be investigated and corrected within the authorized scope. They must not be hidden, skipped, downgraded, or bypassed with `continue-on-error`.
+
+Changes to `ci/validation-policy.json` require focused review because they change what the repository accepts or rejects.
+
+Branch protection is not configured during implementation of `v0.0.3`. It may be configured only after the release has been reviewed and explicitly approved.
+
 ## Tags and GitHub Releases
 
 Tags and GitHub Releases are created only after review and explicit approval. Previous tags and Releases must never be deleted.
@@ -138,6 +150,7 @@ A release is complete only when all applicable conditions are proven:
 - every acceptance criterion is satisfied;
 - the code compiles when the environment permits verification;
 - applicable tests pass;
+- `Repository Validation / validate` passed for the current head;
 - no secrets, credentials, personal data, paid services, or unintended external connections were added;
 - no improper temporary or generated files remain;
 - `git diff --check` passes;

@@ -3,7 +3,7 @@
 Avatar Doctor is a planned local-first Unity Editor package for explainable diagnostics, safe repairs, Quest conversion, and multi-platform publishing assistance for VRChat avatars.
 
 > [!WARNING]
-> Avatar Doctor is in **pre-alpha**. Version `v0.0.2` provides an Editor-only package skeleton, but no functional scanner exists yet. It is not recommended for production use and is not installable through VCC.
+> Avatar Doctor is in **pre-alpha**. Version `v0.0.3` adds automated repository validation, but no functional avatar tooling or scanner exists yet. It is not recommended for production use and is not installable through VCC.
 
 ## Vision
 
@@ -17,7 +17,7 @@ Avatar Doctor is planned to help avatar creators:
 - validate and publish both platforms under the same Avatar ID; and
 - later use a separate local mobile interface for VRChat OSC controls.
 
-These capabilities are roadmap goals, not features available in version `0.0.2`.
+These capabilities are roadmap goals, not features available in version `0.0.3`.
 
 ## Core principles
 
@@ -37,11 +37,13 @@ Blender, external rigging, weight painting, modeling, vertex modification, and m
 
 ## Current repository status
 
-Release `v0.0.2` adds one Editor-only assembly, the stable `Teyocesu.AvatarDoctor.Editor` root namespace, an initial `Editor/Core` source folder, and internal package identity and version constants. It does not add a Unity Editor window, menus, avatar discovery, avatar analysis, scanners, diagnostics, repairs, VRChat SDK integration, Quest conversion logic, publishing logic, a runtime assembly, or a public API.
+Release `v0.0.3` adds a deterministic standard-library-only repository validator, a versioned validation policy, a read-only GitHub Actions check, and local validation documentation. These development safeguards validate repository structure and consistency; they do not compile Unity or provide avatar functionality.
+
+The package still does not provide a Unity Editor window, menus, avatar discovery, scanning, diagnostics, repairs, VRChat SDK integration, Quest conversion, publishing, a runtime assembly, or a public API.
 
 No distributable ZIP, `.unitypackage`, VPM listing, or GitHub Pages site is available yet. Distribution remains deliberately disabled until `v0.0.5 — Release Pipeline` validates the artifacts, manifest, listing, and publication workflow.
 
-Read the complete [project roadmap](docs/ROADMAP.md) and the [controlled release workflow](docs/WORKFLOW.md) before contributing.
+Read the complete [project roadmap](docs/ROADMAP.md), the [controlled release workflow](docs/WORKFLOW.md), and the [repository validation guide](docs/VALIDATION.md) before contributing.
 
 ## Author
 
