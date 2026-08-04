@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "packageRoot": "Packages/com.teyocesu.avatar-doctor",
-  "expectedVersion": "0.0.3",
-  "previousVersion": "0.0.2",
+  "expectedVersion": "0.0.4",
+  "previousVersion": "0.0.3",
   "expectedIdentity": {
     "packageId": "com.teyocesu.avatar-doctor",
     "displayName": "Avatar Doctor",
@@ -30,6 +30,9 @@
   "requiredPackageFiles": [
     "CHANGELOG.md",
     "Editor/Core/AvatarDoctorPackageInfo.cs",
+    "Editor/UI.meta",
+    "Editor/UI/AvatarDoctorWindow.cs",
+    "Editor/UI/AvatarDoctorWindow.cs.meta",
     "Editor/Teyocesu.AvatarDoctor.Editor.asmdef",
     "LICENSE.md",
     "README.md",
@@ -48,6 +51,22 @@
   "allowedNamespaces": [
     "Teyocesu.AvatarDoctor.Editor"
   ],
+  "sourceProfiles": {
+    "Packages/com.teyocesu.avatar-doctor/Editor/Core/AvatarDoctorPackageInfo.cs": {
+      "profile": "constantsOnly",
+      "allowedProhibitedCodePatterns": []
+    },
+    "Packages/com.teyocesu.avatar-doctor/Editor/UI/AvatarDoctorWindow.cs": {
+      "profile": "editorWindowShell",
+      "allowedProhibitedCodePatterns": [
+        "Unity Editor API",
+        "Unity runtime API",
+        "Editor window",
+        "Menu item",
+        "Method or invocation syntax"
+      ]
+    }
+  },
   "approvedBinaryFiles": [
     {
       "path": "Website/favicon.ico",
@@ -347,6 +366,38 @@
       "pattern": "\\bMenuItem\\b"
     },
     {
+      "name": "Asset access",
+      "pattern": "\\b(?:AssetDatabase|Resources)\\b"
+    },
+    {
+      "name": "Editor selection",
+      "pattern": "\\bSelection\\b"
+    },
+    {
+      "name": "Editor serialization",
+      "pattern": "\\b(?:SerializedObject|SerializedProperty)\\b"
+    },
+    {
+      "name": "Editor state",
+      "pattern": "\\b(?:EditorPrefs|SessionState|EditorApplication)\\b"
+    },
+    {
+      "name": "Editor mutation",
+      "pattern": "\\b(?:Undo|PrefabUtility)\\b"
+    },
+    {
+      "name": "Build API",
+      "pattern": "\\bBuildPipeline\\b"
+    },
+    {
+      "name": "Scene API",
+      "pattern": "\\b(?:SceneManager|EditorSceneManager)\\b"
+    },
+    {
+      "name": "Runtime object API",
+      "pattern": "\\b(?:GameObject|Component|Transform)\\b"
+    },
+    {
       "name": "File I/O",
       "pattern": "(?:\\bSystem\\.IO\\b|\\bFile\\s*\\.|\\bDirectory\\s*\\.)"
     },
@@ -359,8 +410,16 @@
       "pattern": "(?:\\bSystem\\.Reflection\\b|\\bReflection\\b)"
     },
     {
+      "name": "Asynchronous execution",
+      "pattern": "(?:\\bSystem\\.Threading\\b|\\bTask\\b|\\basync\\b|\\bThread\\b)"
+    },
+    {
+      "name": "Event subscription",
+      "pattern": "(?:\\+=|-=|\\bRegisterCallback\\s*\\(|\\.clicked\\b)"
+    },
+    {
       "name": "VRChat SDK type",
-      "pattern": "(?:\\bVRCAvatarDescriptor\\b|\\bVRC\\.SDK\\b|\\bPhysBone\\b)"
+      "pattern": "(?:\\bVRCAvatarDescriptor\\b|\\bVRC\\.SDK\\b|\\bPhysBone\\b|\\bContacts?\\b)"
     },
     {
       "name": "Quest behavior",

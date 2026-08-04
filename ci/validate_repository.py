@@ -22,6 +22,7 @@ CHECK_ORDER = (
     "STRUCTURE",
     "ASSEMBLY",
     "SOURCE",
+    "EDITOR_WINDOW",
     "UNITY_METADATA",
     "TEXT_HYGIENE",
     "LANGUAGE",
@@ -39,6 +40,7 @@ PASS_MESSAGES = {
     "STRUCTURE": "Required repository structure is valid.",
     "ASSEMBLY": "Editor assembly configuration is valid.",
     "SOURCE": "Package source remains within the authorized scope.",
+    "EDITOR_WINDOW": "The authorized Editor window shell is valid.",
     "UNITY_METADATA": "Unity metadata is structurally valid.",
     "TEXT_HYGIENE": "Tracked text files satisfy the active hygiene policy.",
     "LANGUAGE": "No basic non-English language markers were found.",
@@ -207,6 +209,7 @@ def load_policy(root: Path) -> Dict[str, Any]:
         "requiredPackageFiles",
         "allowedAssemblyDefinitions",
         "allowedNamespaces",
+        "sourceProfiles",
         "approvedBinaryFiles",
         "forbiddenFilePatterns",
         "forbiddenDirectoryNames",
@@ -353,6 +356,52 @@ def load_policy(root: Path) -> Dict[str, Any]:
                         collection_key, error
                     )
                 ) from error
+
+    source_profiles = policy["sourceProfiles"]
+    expected_source_profiles = {
+        policy["packageRoot"] + "/Editor/Core/AvatarDoctorPackageInfo.cs": "constantsOnly",
+        policy["packageRoot"] + "/Editor/UI/AvatarDoctorWindow.cs": "editorWindowShell",
+    }
+    if not isinstance(source_profiles, dict) or set(source_profiles) != set(
+        expected_source_profiles
+    ):
+        raise ValidatorConfigurationError(
+            "sourceProfiles must define exactly the two authorized package source files."
+        )
+    prohibited_pattern_names = {
+        entry["name"] for entry in policy["prohibitedCodePatterns"]
+    }
+    required_window_exceptions = {
+        "Unity Editor API",
+        "Unity runtime API",
+        "Editor window",
+        "Menu item",
+        "Method or invocation syntax",
+    }
+    for path, expected_profile in sorted(expected_source_profiles.items()):
+        configuration = source_profiles[path]
+        if (
+            not isinstance(configuration, dict)
+            or set(configuration) != {"profile", "allowedProhibitedCodePatterns"}
+            or configuration.get("profile") != expected_profile
+            or not isinstance(configuration.get("allowedProhibitedCodePatterns"), list)
+            or len(configuration["allowedProhibitedCodePatterns"])
+            != len(set(configuration["allowedProhibitedCodePatterns"]))
+            or not set(configuration["allowedProhibitedCodePatterns"]).issubset(
+                prohibited_pattern_names
+            )
+        ):
+            raise ValidatorConfigurationError(
+                "Invalid source profile configuration for {0}.".format(path)
+            )
+        allowed_patterns = set(configuration["allowedProhibitedCodePatterns"])
+        expected_patterns = (
+            set() if expected_profile == "constantsOnly" else required_window_exceptions
+        )
+        if allowed_patterns != expected_patterns:
+            raise ValidatorConfigurationError(
+                "Source profile exceptions are not exact for {0}.".format(path)
+            )
 
     allowed_hygiene_rules = {"bom", "finalNewline", "trailingWhitespace"}
     hygiene_exceptions = policy.get("legacyTextHygieneExceptions", {})
@@ -646,7 +695,7 @@ def check_version(context: RepositoryContext) -> List[Finding]:
         except UnicodeDecodeError:
             changelog = ""
         required_lines = (
-            "## [{0}] - 2026-08-03".format(expected_version),
+            "## [{0}] - 2026-08-04".format(expected_version),
             "[Unreleased]: {0}/compare/v{1}...HEAD".format(
                 policy["expectedIdentity"]["repositoryUrl"], expected_version
             ),
@@ -807,7 +856,6 @@ def check_structure(context: RepositoryContext) -> List[Finding]:
         "Runtime",
         "Scanning",
         "Tests",
-        "UI",
     }
     package_prefix = package_root + "/"
     for relative_path in context.tracked_files:
@@ -830,6 +878,68 @@ def check_structure(context: RepositoryContext) -> List[Finding]:
                     check_id,
                     relative_path,
                     "Empty-folder placeholder is not allowed in the Unity package.",
+                )
+            )
+
+    own_sources = sorted(
+        path
+        for path in context.tracked_files
+        if path.startswith(package_prefix) and path.endswith(".cs")
+    )
+    if len(own_sources) != 2:
+        findings.append(
+            finding(
+                check_id,
+                package_root,
+                "Found {0} package C# source files.".format(len(own_sources)),
+                "Exactly 2",
+            )
+        )
+    editor_window_count = 0
+    menu_item_count = 0
+    for source_path in own_sources:
+        try:
+            source = context.read_text(source_path)
+        except UnicodeDecodeError:
+            continue
+        editor_window_count += len(
+            re.findall(r"\bclass\s+[A-Za-z_][A-Za-z0-9_]*\s*:\s*EditorWindow\b", source)
+        )
+        menu_item_count += len(re.findall(r"\[\s*MenuItem\s*\(", source))
+    if editor_window_count != 1:
+        findings.append(
+            finding(
+                check_id,
+                package_root,
+                "Found {0} Editor window classes.".format(editor_window_count),
+                "Exactly 1",
+            )
+        )
+    if menu_item_count != 1:
+        findings.append(
+            finding(
+                check_id,
+                package_root,
+                "Found {0} MenuItem attributes.".format(menu_item_count),
+                "Exactly 1",
+            )
+        )
+
+    for extension, label in ((".uxml", "UXML"), (".uss", "USS")):
+        matching_assets = sorted(
+            path
+            for path in context.tracked_files
+            if path.startswith(package_prefix) and path.lower().endswith(extension)
+        )
+        if matching_assets:
+            findings.append(
+                finding(
+                    check_id,
+                    matching_assets[0],
+                    "Found {0} package {1} files.".format(
+                        len(matching_assets), label
+                    ),
+                    "Exactly 0",
                 )
             )
 
@@ -925,26 +1035,278 @@ def check_assembly(context: RepositoryContext) -> List[Finding]:
     return findings
 
 
+def check_constants_only_source(
+    context: RepositoryContext, source_path: str, source: str
+) -> List[Finding]:
+    check_id = "SOURCE"
+    policy = context.policy
+    identity = policy["expectedIdentity"]
+    approved_constants = (
+        ("PackageId", identity["packageId"]),
+        ("DisplayName", identity["displayName"]),
+        ("Version", policy["expectedVersion"]),
+        ("Author", identity["author"]),
+        ("Repository", identity["repository"]),
+    )
+    skeleton_parts = [
+        r"\s*namespace\s+{0}\.Core\s*\{{".format(
+            re.escape(identity["rootNamespace"])
+        ),
+        r"\s*internal\s+static\s+class\s+AvatarDoctorPackageInfo\s*\{",
+    ]
+    for constant_name, constant_value in approved_constants:
+        skeleton_parts.append(
+            r'\s*internal\s+const\s+string\s+{0}\s*=\s*"{1}"\s*;'.format(
+                re.escape(constant_name), re.escape(constant_value)
+            )
+        )
+    skeleton_parts.append(r"\s*\}\s*\}\s*")
+    if re.fullmatch("".join(skeleton_parts), source):
+        return []
+    return [
+        finding(
+            check_id,
+            source_path,
+            "C# source differs from the constants-only source profile.",
+            "Namespace, internal static class, and five approved constants only",
+        )
+    ]
+
+
+def authorized_editor_window_lines() -> Tuple[str, ...]:
+    return (
+        "using Teyocesu.AvatarDoctor.Editor.Core;",
+        "using UnityEditor;",
+        "using UnityEngine;",
+        "using UnityEngine.UIElements;",
+        "namespace Teyocesu.AvatarDoctor.Editor.UI",
+        "{",
+        "internal sealed class AvatarDoctorWindow : EditorWindow",
+        "{",
+        'private const string MenuPath = "Tools/Avatar Doctor";',
+        "private const int MenuPriority = 2000;",
+        "private const float MinimumWidth = 420f;",
+        "private const float MinimumHeight = 220f;",
+        'private const string StatusText = "Pre-alpha - Window shell";',
+        'private const string UnavailableAnalysisMessage = "Avatar analysis is not available in this version.";',
+        'private const string VersionPrefix = "Version ";',
+        "[MenuItem(MenuPath, false, MenuPriority)]",
+        "private static void OpenWindow()",
+        "{",
+        "AvatarDoctorWindow window = GetWindow<AvatarDoctorWindow>();",
+        "window.titleContent = new GUIContent(AvatarDoctorPackageInfo.DisplayName);",
+        "window.minSize = new Vector2(MinimumWidth, MinimumHeight);",
+        "window.Show();",
+        "}",
+        "private void OnEnable()",
+        "{",
+        "titleContent = new GUIContent(AvatarDoctorPackageInfo.DisplayName);",
+        "minSize = new Vector2(MinimumWidth, MinimumHeight);",
+        "}",
+        "public void CreateGUI()",
+        "{",
+        "VisualElement root = rootVisualElement;",
+        "rootVisualElement.Clear();",
+        "root.style.flexDirection = FlexDirection.Column;",
+        "root.style.flexGrow = 1;",
+        "root.style.paddingTop = 16;",
+        "root.style.paddingRight = 16;",
+        "root.style.paddingBottom = 16;",
+        "root.style.paddingLeft = 16;",
+        "VisualElement content = new VisualElement();",
+        "content.style.flexDirection = FlexDirection.Column;",
+        "content.style.flexGrow = 1;",
+        "Label heading = new Label(AvatarDoctorPackageInfo.DisplayName);",
+        "heading.style.fontSize = 20;",
+        "heading.style.unityFontStyleAndWeight = FontStyle.Bold;",
+        "heading.style.whiteSpace = WhiteSpace.Normal;",
+        "heading.style.marginBottom = 8;",
+        "content.Add(heading);",
+        "Label status = new Label(StatusText);",
+        "status.style.unityFontStyleAndWeight = FontStyle.Bold;",
+        "status.style.whiteSpace = WhiteSpace.Normal;",
+        "status.style.marginBottom = 8;",
+        "content.Add(status);",
+        "Label unavailableAnalysis = new Label(UnavailableAnalysisMessage);",
+        "unavailableAnalysis.style.whiteSpace = WhiteSpace.Normal;",
+        "unavailableAnalysis.style.marginBottom = 8;",
+        "content.Add(unavailableAnalysis);",
+        "Label version = new Label(VersionPrefix + AvatarDoctorPackageInfo.Version);",
+        "version.style.whiteSpace = WhiteSpace.Normal;",
+        "content.Add(version);",
+        "root.Add(content);",
+        "}",
+        "}",
+        "}",
+    )
+
+
+def check_editor_window_source_profile(
+    source_path: str, source: str
+) -> List[Finding]:
+    check_id = "SOURCE"
+    findings: List[Finding] = []
+    actual_lines = tuple(line.strip() for line in source.splitlines() if line.strip())
+    if actual_lines != authorized_editor_window_lines():
+        findings.append(
+            finding(
+                check_id,
+                source_path,
+                "Editor window source differs from the exact authorized shell profile.",
+                "Only the approved using directives, constants, lifecycle methods, and UI statements",
+            )
+        )
+    required_usings = {
+        "Teyocesu.AvatarDoctor.Editor.Core",
+        "UnityEditor",
+        "UnityEngine",
+        "UnityEngine.UIElements",
+    }
+    actual_usings = re.findall(r"^\s*using\s+([^;]+?)\s*;", source, re.MULTILINE)
+    if len(actual_usings) != len(required_usings) or set(actual_usings) != required_usings:
+        findings.append(
+            finding(
+                check_id,
+                source_path,
+                "Editor window using directives are outside the authorized profile.",
+                "Exactly the package Core, UnityEditor, UnityEngine, and UIElements namespaces",
+            )
+        )
+
+    allowed_new_types = {"GUIContent", "Label", "Vector2", "VisualElement"}
+    created_types = set(
+        re.findall(r"\bnew\s+([A-Za-z_][A-Za-z0-9_.]*)\s*\(", source)
+    )
+    unexpected_new_types = sorted(created_types - allowed_new_types)
+    if unexpected_new_types:
+        findings.append(
+            finding(
+                check_id,
+                source_path,
+                "Unauthorized constructed type: {0}.".format(
+                    unexpected_new_types[0]
+                ),
+                "GUIContent, Label, Vector2, or VisualElement",
+            )
+        )
+
+    allowed_invocations = {
+        "Add",
+        "Clear",
+        "CreateGUI",
+        "GetWindow",
+        "GUIContent",
+        "Label",
+        "MenuItem",
+        "OnEnable",
+        "OpenWindow",
+        "Show",
+        "Vector2",
+        "VisualElement",
+    }
+    invocations = set(
+        re.findall(
+            r"\b([A-Za-z_][A-Za-z0-9_]*)\s*(?:<[^>\n]+>)?\s*\(", source
+        )
+    )
+    unexpected_invocations = sorted(invocations - allowed_invocations)
+    if unexpected_invocations:
+        findings.append(
+            finding(
+                check_id,
+                source_path,
+                "Unauthorized method or constructor invocation: {0}.".format(
+                    unexpected_invocations[0]
+                ),
+                "Only the Editor window shell invocation set",
+            )
+        )
+
+    allowed_style_properties = {
+        "flexDirection",
+        "flexGrow",
+        "fontSize",
+        "marginBottom",
+        "paddingBottom",
+        "paddingLeft",
+        "paddingRight",
+        "paddingTop",
+        "unityFontStyleAndWeight",
+        "whiteSpace",
+    }
+    style_properties = set(
+        re.findall(r"\.style\.([A-Za-z_][A-Za-z0-9_]*)", source)
+    )
+    unexpected_style_properties = sorted(style_properties - allowed_style_properties)
+    if unexpected_style_properties:
+        findings.append(
+            finding(
+                check_id,
+                source_path,
+                "Unauthorized UI style property: {0}.".format(
+                    unexpected_style_properties[0]
+                ),
+                "Only layout, spacing, wrapping, and font emphasis",
+            )
+        )
+
+    prohibited_controls = re.search(
+        r"\b(?:Button|Toggle|TextField|ObjectField|ListView|ScrollView|"
+        r"ProgressBar|Toolbar|Image)\b",
+        source,
+    )
+    if prohibited_controls:
+        findings.append(
+            finding(
+                check_id,
+                source_path,
+                "Functional or graphical control is not authorized: {0}.".format(
+                    prohibited_controls.group(0)
+                ),
+                "VisualElement and Label only",
+            )
+        )
+    if re.search(r"\bTODO\b", source):
+        findings.append(
+            finding(check_id, source_path, "Future-functionality TODO is not authorized.")
+        )
+    if re.search(
+        r"\bstatic\s+(?!void\s+OpenWindow\b)[A-Za-z_][A-Za-z0-9_<>,.?\[\] ]*\s+"
+        r"[A-Za-z_][A-Za-z0-9_]*\s*(?:=|;)",
+        source,
+    ):
+        findings.append(
+            finding(check_id, source_path, "Mutable static state is not authorized.")
+        )
+    return findings
+
+
 def check_source(context: RepositoryContext) -> List[Finding]:
     check_id = "SOURCE"
     policy = context.policy
     package_prefix = policy["packageRoot"] + "/"
     allowed_namespaces = tuple(policy["allowedNamespaces"])
+    source_profiles = policy["sourceProfiles"]
+    expected_source_paths = set(source_profiles)
     source_paths = sorted(
         path
         for path in context.tracked_files
         if path.startswith(package_prefix) and path.endswith(".cs")
     )
     findings: List[Finding] = []
-    if len(source_paths) != 1:
+    for missing_path in sorted(expected_source_paths - set(source_paths)):
+        findings.append(
+            finding(check_id, missing_path, "Authorized C# source is not tracked.")
+        )
+    for unexpected_path in sorted(set(source_paths) - expected_source_paths):
         findings.append(
             finding(
                 check_id,
-                policy["packageRoot"],
-                "Found {0} package C# source files.".format(len(source_paths)),
-                "Exactly 1",
+                unexpected_path,
+                "C# source has no authorized file-specific profile.",
             )
         )
+
     compiled_patterns = [
         (entry["name"], re.compile(entry["pattern"]))
         for entry in policy["prohibitedCodePatterns"]
@@ -957,36 +1319,17 @@ def check_source(context: RepositoryContext) -> List[Finding]:
                 finding(check_id, source_path, "C# source is not valid UTF-8.", "UTF-8")
             )
             continue
-        identity = policy["expectedIdentity"]
-        approved_constants = (
-            ("PackageId", identity["packageId"]),
-            ("DisplayName", identity["displayName"]),
-            ("Version", policy["expectedVersion"]),
-            ("Author", identity["author"]),
-            ("Repository", identity["repository"]),
-        )
-        skeleton_parts = [
-            r"\s*namespace\s+{0}\.Core\s*\{{".format(
-                re.escape(identity["rootNamespace"])
-            ),
-            r"\s*internal\s+static\s+class\s+AvatarDoctorPackageInfo\s*\{",
-        ]
-        for constant_name, constant_value in approved_constants:
-            skeleton_parts.append(
-                r'\s*internal\s+const\s+string\s+{0}\s*=\s*"{1}"\s*;'.format(
-                    re.escape(constant_name), re.escape(constant_value)
+
+        profile_configuration = source_profiles.get(source_path)
+        if profile_configuration is not None:
+            profile_name = profile_configuration["profile"]
+            if profile_name == "constantsOnly":
+                findings.extend(
+                    check_constants_only_source(context, source_path, source)
                 )
-            )
-        skeleton_parts.append(r"\s*\}\s*\}\s*")
-        if not re.fullmatch("".join(skeleton_parts), source):
-            findings.append(
-                finding(
-                    check_id,
-                    source_path,
-                    "C# source differs from the approved metadata-only skeleton.",
-                    "Namespace, internal static class, and five approved constants only",
-                )
-            )
+            elif profile_name == "editorWindowShell":
+                findings.extend(check_editor_window_source_profile(source_path, source))
+
         namespaces = re.findall(
             r"\bnamespace\s+([A-Za-z_][A-Za-z0-9_.]*)", source
         )
@@ -1024,7 +1367,15 @@ def check_source(context: RepositoryContext) -> List[Finding]:
             findings.append(
                 finding(check_id, source_path, "Unsafe C# code is not authorized.")
             )
+
+        allowed_patterns = (
+            set(profile_configuration["allowedProhibitedCodePatterns"])
+            if profile_configuration is not None
+            else set()
+        )
         for name, pattern in compiled_patterns:
+            if name in allowed_patterns:
+                continue
             match = pattern.search(source)
             if match:
                 line = source.count("\n", 0, match.start()) + 1
@@ -1033,9 +1384,444 @@ def check_source(context: RepositoryContext) -> List[Finding]:
                         check_id,
                         source_path,
                         "Prohibited {0} pattern found at line {1}.".format(name, line),
-                        "Pattern absent for the current release scope",
+                        "Pattern absent for the file-specific source profile",
                     )
                 )
+    return findings
+
+
+def extract_method_body(source: str, signature: str) -> Optional[str]:
+    signature_index = source.find(signature)
+    if signature_index < 0:
+        return None
+    opening_brace = source.find("{", signature_index + len(signature))
+    if opening_brace < 0:
+        return None
+    depth = 0
+    for index in range(opening_brace, len(source)):
+        character = source[index]
+        if character == "{":
+            depth += 1
+        elif character == "}":
+            depth -= 1
+            if depth == 0:
+                return source[opening_brace + 1 : index]
+    return None
+
+
+def check_editor_window(context: RepositoryContext) -> List[Finding]:
+    check_id = "EDITOR_WINDOW"
+    package_root = context.policy["packageRoot"]
+    source_path = package_root + "/Editor/UI/AvatarDoctorWindow.cs"
+    folder_meta_path = package_root + "/Editor/UI.meta"
+    script_meta_path = source_path + ".meta"
+    findings: List[Finding] = []
+
+    if not context.is_tracked(source_path):
+        return [
+            finding(
+                check_id,
+                source_path,
+                "Authorized Editor window source is not tracked.",
+            )
+        ]
+    try:
+        source = context.read_text(source_path)
+    except UnicodeDecodeError:
+        return [
+            finding(check_id, source_path, "Editor window source is not valid UTF-8.")
+        ]
+
+    actual_lines = tuple(line.strip() for line in source.splitlines() if line.strip())
+    if actual_lines != authorized_editor_window_lines():
+        findings.append(
+            finding(
+                check_id,
+                source_path,
+                "Editor window source differs from the exact authorized shell shape.",
+                "Only the approved declarations and UI statements",
+            )
+        )
+
+    expected_namespace = "Teyocesu.AvatarDoctor.Editor.UI"
+    namespaces = re.findall(
+        r"\bnamespace\s+([A-Za-z_][A-Za-z0-9_.]*)", source
+    )
+    if namespaces != [expected_namespace]:
+        findings.append(
+            finding(
+                check_id,
+                source_path,
+                "Editor window namespace is not exact.",
+                expected_namespace,
+            )
+        )
+    class_declaration = "internal sealed class AvatarDoctorWindow : EditorWindow"
+    if source.count(class_declaration) != 1:
+        findings.append(
+            finding(
+                check_id,
+                source_path,
+                "Editor window class declaration is not exact.",
+                class_declaration,
+            )
+        )
+    type_declarations = re.findall(
+        r"\b(?:class|struct|interface|enum|record)\s+"
+        r"([A-Za-z_][A-Za-z0-9_]*)\b",
+        source,
+    )
+    if type_declarations != ["AvatarDoctorWindow"]:
+        findings.append(
+            finding(
+                check_id,
+                source_path,
+                "Editor window source must contain exactly one type declaration.",
+                "AvatarDoctorWindow only",
+            )
+        )
+
+    package_sources = sorted(
+        path
+        for path in context.tracked_files
+        if path.startswith(package_root + "/") and path.endswith(".cs")
+    )
+    editor_window_count = 0
+    menu_item_count = 0
+    for package_source_path in package_sources:
+        try:
+            package_source = context.read_text(package_source_path)
+        except UnicodeDecodeError:
+            continue
+        editor_window_count += len(
+            re.findall(
+                r"\bclass\s+[A-Za-z_][A-Za-z0-9_]*\s*:\s*EditorWindow\b",
+                package_source,
+            )
+        )
+        menu_item_count += len(re.findall(r"\[\s*MenuItem\s*\(", package_source))
+    if editor_window_count != 1:
+        findings.append(
+            finding(
+                check_id,
+                package_root,
+                "Package contains {0} Editor window classes.".format(
+                    editor_window_count
+                ),
+                "Exactly 1",
+            )
+        )
+    if menu_item_count != 1:
+        findings.append(
+            finding(
+                check_id,
+                package_root,
+                "Package contains {0} MenuItem attributes.".format(menu_item_count),
+                "Exactly 1",
+            )
+        )
+
+    required_constants = (
+        'private const string MenuPath = "Tools/Avatar Doctor";',
+        "private const int MenuPriority = 2000;",
+        "private const float MinimumWidth = 420f;",
+        "private const float MinimumHeight = 220f;",
+        'private const string StatusText = "Pre-alpha - Window shell";',
+        'private const string UnavailableAnalysisMessage = "Avatar analysis is not available in this version.";',
+        'private const string VersionPrefix = "Version ";',
+    )
+    for required_constant in required_constants:
+        if source.count(required_constant) != 1:
+            findings.append(
+                finding(
+                    check_id,
+                    source_path,
+                    "Required private constant is missing or duplicated.",
+                    required_constant,
+                )
+            )
+    field_declarations = re.findall(
+        r"^\s*(?:private|protected|internal|public)\s+"
+        r"(?:(?:static|readonly|const)\s+)*"
+        r"[A-Za-z_][A-Za-z0-9_<>,.?\[\] ]*\s+"
+        r"[A-Za-z_][A-Za-z0-9_]*\s*(?:=[^;\n]*)?;\s*$",
+        source,
+        re.MULTILINE,
+    )
+    if len(field_declarations) != len(required_constants):
+        findings.append(
+            finding(
+                check_id,
+                source_path,
+                "Editor window fields differ from the seven authorized constants.",
+                "Exactly 7 private constants and no mutable fields",
+            )
+        )
+
+    menu_attribute = "[MenuItem(MenuPath, false, MenuPriority)]"
+    if source.count(menu_attribute) != 1:
+        findings.append(
+            finding(
+                check_id,
+                source_path,
+                "MenuItem declaration is not exact.",
+                menu_attribute,
+            )
+        )
+    signatures = {
+        "OpenWindow": "private static void OpenWindow()",
+        "OnEnable": "private void OnEnable()",
+        "CreateGUI": "public void CreateGUI()",
+    }
+    method_declarations = re.findall(
+        r"^\s*(?:private|protected|internal|public)\s+(?:static\s+)?"
+        r"[A-Za-z_][A-Za-z0-9_<>,.?\[\] ]*\s+"
+        r"([A-Za-z_][A-Za-z0-9_]*)\s*\(\s*\)\s*$",
+        source,
+        re.MULTILINE,
+    )
+    if sorted(method_declarations) != sorted(signatures):
+        findings.append(
+            finding(
+                check_id,
+                source_path,
+                "Editor window methods differ from the authorized lifecycle.",
+                "OpenWindow, OnEnable, and CreateGUI only",
+            )
+        )
+    method_bodies: Dict[str, Optional[str]] = {}
+    for method_name, signature in signatures.items():
+        if source.count(signature) != 1:
+            findings.append(
+                finding(
+                    check_id,
+                    source_path,
+                    "Required method signature is missing or duplicated.",
+                    signature,
+                )
+            )
+        method_bodies[method_name] = extract_method_body(source, signature)
+        if method_bodies[method_name] is None:
+            findings.append(
+                finding(
+                    check_id,
+                    source_path,
+                    "Required method body could not be read: {0}.".format(method_name),
+                )
+            )
+
+    open_window = method_bodies["OpenWindow"] or ""
+    required_open_window_fragments = (
+        "AvatarDoctorWindow window = GetWindow<AvatarDoctorWindow>();",
+        "window.titleContent = new GUIContent(AvatarDoctorPackageInfo.DisplayName);",
+        "window.minSize = new Vector2(MinimumWidth, MinimumHeight);",
+        "window.Show();",
+    )
+    for fragment in required_open_window_fragments:
+        if open_window.count(fragment) != 1:
+            findings.append(
+                finding(
+                    check_id,
+                    source_path,
+                    "OpenWindow does not implement the exact reusable window setup.",
+                    fragment,
+                )
+            )
+    if "new AvatarDoctorWindow" in source:
+        findings.append(
+            finding(
+                check_id,
+                source_path,
+                "Editor window must be reused through GetWindow.",
+            )
+        )
+
+    on_enable = method_bodies["OnEnable"] or ""
+    required_on_enable_fragments = (
+        "titleContent = new GUIContent(AvatarDoctorPackageInfo.DisplayName);",
+        "minSize = new Vector2(MinimumWidth, MinimumHeight);",
+    )
+    for fragment in required_on_enable_fragments:
+        if on_enable.count(fragment) != 1:
+            findings.append(
+                finding(
+                    check_id,
+                    source_path,
+                    "OnEnable does not restore the exact window identity and size.",
+                    fragment,
+                )
+            )
+    if re.search(r"(?:new\s+(?:Label|VisualElement)|\.Add\s*\(|\.Clear\s*\()", on_enable):
+        findings.append(
+            finding(
+                check_id,
+                source_path,
+                "OnEnable must not construct or duplicate the visual tree.",
+            )
+        )
+
+    create_gui = method_bodies["CreateGUI"] or ""
+    required_create_gui_fragments = (
+        "VisualElement root = rootVisualElement;",
+        "rootVisualElement.Clear();",
+        "VisualElement content = new VisualElement();",
+        "root.Add(content);",
+    )
+    for fragment in required_create_gui_fragments:
+        if create_gui.count(fragment) != 1:
+            findings.append(
+                finding(
+                    check_id,
+                    source_path,
+                    "CreateGUI is missing required deterministic tree construction.",
+                    fragment,
+                )
+            )
+    clear_index = create_gui.find("rootVisualElement.Clear();")
+    first_add_index = create_gui.find(".Add(")
+    if clear_index < 0 or first_add_index < 0 or clear_index > first_add_index:
+        findings.append(
+            finding(
+                check_id,
+                source_path,
+                "CreateGUI must clear the root before adding elements.",
+                "rootVisualElement.Clear() before the first Add()",
+            )
+        )
+
+    label_expressions = (
+        "new Label(AvatarDoctorPackageInfo.DisplayName)",
+        "new Label(StatusText)",
+        "new Label(UnavailableAnalysisMessage)",
+        "new Label(VersionPrefix + AvatarDoctorPackageInfo.Version)",
+    )
+    label_positions = [create_gui.find(expression) for expression in label_expressions]
+    if (
+        any(position < 0 for position in label_positions)
+        or label_positions != sorted(label_positions)
+        or len(re.findall(r"\bnew\s+Label\s*\(", create_gui)) != 4
+    ):
+        findings.append(
+            finding(
+                check_id,
+                source_path,
+                "Visible labels are missing, duplicated, or out of order.",
+                "Display name, status, unavailable-analysis message, then package version",
+            )
+        )
+    add_expressions = (
+        "content.Add(heading);",
+        "content.Add(status);",
+        "content.Add(unavailableAnalysis);",
+        "content.Add(version);",
+        "root.Add(content);",
+    )
+    add_positions = [create_gui.find(expression) for expression in add_expressions]
+    if (
+        any(position < 0 for position in add_positions)
+        or add_positions != sorted(add_positions)
+        or len(re.findall(r"\.Add\s*\(", create_gui)) != 5
+    ):
+        findings.append(
+            finding(
+                check_id,
+                source_path,
+                "Visual elements are not added exactly once in the authorized order.",
+                "Heading, status, message, version, then the content container",
+            )
+        )
+    if '"0.0.4"' in source:
+        findings.append(
+            finding(
+                check_id,
+                source_path,
+                "Visible package version is hardcoded in the Editor window.",
+                "AvatarDoctorPackageInfo.Version",
+            )
+        )
+
+    prohibited_tokens = re.search(
+        r"\b(?:AssetDatabase|Selection|SerializedObject|SerializedProperty|"
+        r"EditorPrefs|SessionState|EditorApplication|Undo|PrefabUtility|"
+        r"BuildPipeline|SceneManager|EditorSceneManager|GameObject|Component|"
+        r"Transform|Resources|Task|Thread|Socket|VRCAvatarDescriptor|PhysBone|"
+        r"Contacts?|Update|OnInspectorUpdate|OnHierarchyChange|OnSelectionChange|"
+        r"OnProjectChange|Button|Toggle|TextField|ObjectField|ListView|ScrollView|"
+        r"ProgressBar|Toolbar|Image)\b",
+        source,
+    )
+    if prohibited_tokens:
+        findings.append(
+            finding(
+                check_id,
+                source_path,
+                "Unauthorized Editor window token: {0}.".format(
+                    prohibited_tokens.group(0)
+                ),
+                "Token absent",
+            )
+        )
+    if re.search(
+        r"(?:\bSystem\.(?:IO|Net|Reflection|Threading)\b|\bVRC\.SDK\b|"
+        r"\basync\b|\+=|-=|\bRegisterCallback\s*\(|\.clicked\b|\bevent\b)",
+        source,
+    ):
+        findings.append(
+            finding(
+                check_id,
+                source_path,
+                "File, network, reflection, asynchronous, SDK, or event behavior is not authorized.",
+            )
+        )
+
+    for meta_path, expected_marker in (
+        (folder_meta_path, "folderAsset: yes"),
+        (script_meta_path, "MonoImporter:"),
+    ):
+        if not context.is_tracked(meta_path):
+            findings.append(
+                finding(
+                    check_id,
+                    meta_path,
+                    "Required Editor window metadata is not tracked.",
+                )
+            )
+            continue
+        try:
+            metadata = context.read_text(meta_path)
+        except UnicodeDecodeError:
+            findings.append(
+                finding(check_id, meta_path, "Editor window metadata is not UTF-8.")
+            )
+            continue
+        if expected_marker not in metadata:
+            findings.append(
+                finding(
+                    check_id,
+                    meta_path,
+                    "Editor window metadata uses the wrong importer shape.",
+                    expected_marker,
+                )
+            )
+        if metadata_value(metadata, "fileFormatVersion") != "2":
+            findings.append(
+                finding(
+                    check_id,
+                    meta_path,
+                    "Editor window metadata has an invalid file format version.",
+                    "2",
+                )
+            )
+        guid = metadata_value(metadata, "guid")
+        if guid is None or not GUID_PATTERN.fullmatch(guid):
+            findings.append(
+                finding(
+                    check_id,
+                    meta_path,
+                    "Editor window metadata has an invalid GUID.",
+                    "32 hexadecimal characters",
+                )
+            )
     return findings
 
 
@@ -1814,6 +2600,7 @@ CHECKS: Dict[str, Callable[[RepositoryContext], List[Finding]]] = {
     "STRUCTURE": check_structure,
     "ASSEMBLY": check_assembly,
     "SOURCE": check_source,
+    "EDITOR_WINDOW": check_editor_window,
     "UNITY_METADATA": check_unity_metadata,
     "TEXT_HYGIENE": check_text_hygiene,
     "LANGUAGE": check_language,
