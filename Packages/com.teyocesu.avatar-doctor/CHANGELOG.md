@@ -8,6 +8,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 No unreleased changes.
 
+## [0.0.3] - 2026-08-03
+
+### Added
+
+- Deterministic standard-library-only repository validation.
+- Read-only GitHub Actions validation for Pull Requests and `main`.
+- Repository validation policy and local troubleshooting documentation.
+
+### Changed
+
+- Updated package metadata and internal version constants to `0.0.3`.
+- Updated the controlled workflow to require successful repository validation before release approval.
+
 ## [0.0.2] - 2026-08-03
 
 ### Added
@@ -32,6 +45,7 @@ No unreleased changes.
 - Disabled Unity project analytics settings inherited from the template.
 - Restricted manual release automation to the `main` branch.
 
-[Unreleased]: https://github.com/Teyocesu/Avatar-Doctor/compare/v0.0.2...HEAD
+[Unreleased]: https://github.com/Teyocesu/Avatar-Doctor/compare/v0.0.3...HEAD
+[0.0.3]: https://github.com/Teyocesu/Avatar-Doctor/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/Teyocesu/Avatar-Doctor/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/Teyocesu/Avatar-Doctor/releases/tag/v0.0.1
