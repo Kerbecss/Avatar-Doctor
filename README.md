@@ -1,55 +1,47 @@
 # Avatar Doctor
 
-Avatar Doctor is a planned local-first Unity Editor package for explainable diagnostics, safe repairs, Quest conversion, and multi-platform publishing assistance for VRChat avatars.
+Avatar Doctor is a Unity Editor package for inspecting VRChat avatars, presenting explainable findings, planning safe repairs, preparing Quest variants, and assisting multi-platform publishing.
 
-> [!WARNING]
-> Avatar Doctor is in **pre-alpha**. Version `v0.0.4` adds the first Unity Editor window, but it is only a non-functional shell. It does not discover or analyze avatars, is not recommended for production use, and is not installable through VCC.
+## Status
 
-## Vision
+- Avatar Doctor is in pre-alpha.
+- The current release is `0.0.5`.
+- Open the package window through `Tools → Avatar Doctor`.
+- The window is currently a presentation-only shell without avatar analysis.
+- The package is not yet available from a public VCC listing.
+- The release pipeline is planned for `v0.0.6`.
 
-Avatar Doctor is planned to help avatar creators:
+## Planned capabilities
 
-- inspect VRChat avatars inside Unity;
-- connect symptoms to probable root causes using verifiable evidence;
-- explain detected problems, affected objects, risks, and possible repairs;
-- apply only safe, reversible changes with preview, Undo, backup, or rollback;
-- prepare non-destructive Quest variants and compare PC and Quest behavior;
-- validate and publish both platforms under the same Avatar ID; and
-- later use a separate local mobile interface for VRChat OSC controls.
+- Avatar inspection.
+- Explainable diagnostics.
+- Safe repairs.
+- PC and Quest comparison.
+- Quest preparation.
+- Build validation.
+- Multi-platform publishing assistance.
 
-These capabilities are roadmap goals, not features available in version `0.0.4`.
+## Current functionality
 
-## Core principles
+The package currently provides one Editor-only assembly and one code-only UI Toolkit window. The window displays the package name, pre-alpha status, unavailable-analysis message, and package version. It contains no buttons or functional controls, reuses a single window instance, and rebuilds its visual tree safely after a Domain Reload.
 
-- **Local first:** avatar analysis and project modification will run only on the computer where Unity is open.
-- **Explainable by design:** diagnostics will come from a deterministic expert system and objective evidence, not invented confidence values.
-- **Safe changes:** ambiguous repairs will never be applied automatically, and original third-party assets will be preserved whenever a copy can be used.
-- **Mandatory cost of USD 0:** the project and its required operation must remain free of charge.
-- **No paid AI APIs:** generative AI services are not a runtime dependency or part of the diagnostic engine.
-- **No required servers:** the project will not require project-owned hosting, databases, SaaS accounts, or remote telemetry.
-- **Unity-only project work:** inspection, diagnosis, repair, conversion, building, and publishing will happen exclusively on the PC running Unity.
+The repository also includes deterministic validation for package metadata, source structure, Unity metadata, workflows, public documentation, and roadmap consistency. Avatar discovery, scanning, diagnostics, repairs, SDK integration, Quest preparation, build validation, and publishing are not implemented yet.
 
-## Scope boundaries
+## Contributing
 
-The future **Avatar Remote** is a separate local companion limited to controlling the active VRChat avatar through OSC. It will not read or modify Unity projects, create toggles, run builds, publish avatars, change project materials, or execute arbitrary code on the PC.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, validation, branch, commit, and Pull Request guidance.
 
-Blender, external rigging, weight painting, modeling, vertex modification, and mesh editing outside Unity are explicitly outside the project scope.
+## Documentation
 
-## Current repository status
-
-Release `v0.0.4` adds the first code-only UI Toolkit Editor window. Open it through `Tools → Avatar Doctor`. The window displays the package name, pre-alpha shell status, unavailable-analysis message, and package version. It contains no functional controls and safely rebuilds its visual tree after Unity invokes `CreateGUI` again.
-
-The repository also includes a deterministic standard-library-only validator, versioned validation policy, read-only GitHub Actions check, and local validation documentation. These development safeguards validate repository structure and consistency; they do not provide avatar functionality.
-
-The package does not discover or analyze avatars. It still provides no scanner, diagnostics, repairs, VRChat SDK integration, Quest conversion, publishing, runtime assembly, or public API.
-
-No distributable ZIP, `.unitypackage`, VPM listing, or GitHub Pages site is available yet. Distribution remains deliberately disabled until `v0.0.5 — Release Pipeline` validates the artifacts, manifest, listing, and publication workflow.
-
-Read the complete [project roadmap](docs/ROADMAP.md), the [controlled release workflow](docs/WORKFLOW.md), and the [repository validation guide](docs/VALIDATION.md) before contributing.
+- [Roadmap](docs/ROADMAP.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Repository validation](docs/VALIDATION.md)
+- [Development and release workflow](docs/WORKFLOW.md)
+- [Technical baseline](docs/TECHNICAL_BASELINE.md)
 
 ## Author
 
-Avatar Doctor is maintained publicly by **Teyocesu**.
+Avatar Doctor is maintained by **Teyocesu**.
 
 ## Disclaimer
 

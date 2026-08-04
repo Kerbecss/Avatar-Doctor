@@ -31,6 +31,7 @@ CHECK_ORDER = (
     "PROHIBITED_FILES",
     "WORKFLOWS",
     "ROADMAP_GUARD",
+    "PUBLIC_CONTENT",
 )
 
 PASS_MESSAGES = {
@@ -39,8 +40,8 @@ PASS_MESSAGES = {
     "IDENTITY": "Package identity is consistent.",
     "STRUCTURE": "Required repository structure is valid.",
     "ASSEMBLY": "Editor assembly configuration is valid.",
-    "SOURCE": "Package source remains within the authorized scope.",
-    "EDITOR_WINDOW": "The authorized Editor window shell is valid.",
+    "SOURCE": "Package source matches the active policy.",
+    "EDITOR_WINDOW": "The Editor window shell matches the active policy.",
     "UNITY_METADATA": "Unity metadata is structurally valid.",
     "TEXT_HYGIENE": "Tracked text files satisfy the active hygiene policy.",
     "LANGUAGE": "No basic non-English language markers were found.",
@@ -48,7 +49,8 @@ PASS_MESSAGES = {
     "SECRETS": "No high-signal secret patterns were found.",
     "PROHIBITED_FILES": "No prohibited tracked files were found.",
     "WORKFLOWS": "Protected workflow conditions are valid.",
-    "ROADMAP_GUARD": "Required roadmap boundaries are present.",
+    "ROADMAP_GUARD": "The roadmap release sequence is valid.",
+    "PUBLIC_CONTENT": "Maintained public content matches the active policy.",
 }
 
 EMAIL_PATTERN = re.compile(
@@ -225,6 +227,7 @@ def load_policy(root: Path) -> Dict[str, Any]:
         "prohibitedCodePatterns",
         "protectedWorkflows",
         "roadmapGuard",
+        "publicContent",
     )
     missing = [key for key in required_keys if key not in policy]
     if missing:
@@ -324,16 +327,94 @@ def load_policy(root: Path) -> Dict[str, Any]:
                 )
             )
     roadmap_guard = policy["roadmapGuard"]
-    if (
-        not isinstance(roadmap_guard, dict)
-        or not isinstance(roadmap_guard.get("requiredReleases"), list)
-        or not roadmap_guard["requiredReleases"]
-        or not isinstance(roadmap_guard.get("requiredBoundaries"), list)
-        or not roadmap_guard["requiredBoundaries"]
+    roadmap_keys = (
+        "requiredStages",
+        "orderedReleaseHeadings",
+        "forbiddenHeadings",
+        "requiredStableCapabilities",
+    )
+    if not isinstance(roadmap_guard, dict) or any(
+        not isinstance(roadmap_guard.get(key), list) or not roadmap_guard[key]
+        for key in roadmap_keys
+    ):
+        raise ValidatorConfigurationError("Validation policy roadmapGuard is incomplete.")
+    for key in roadmap_keys:
+        values = roadmap_guard[key]
+        if any(not isinstance(value, str) or not value for value in values):
+            raise ValidatorConfigurationError(
+                "Validation policy roadmapGuard.{0} must contain strings.".format(key)
+            )
+        if len(values) != len(set(values)):
+            raise ValidatorConfigurationError(
+                "Validation policy roadmapGuard.{0} contains duplicates.".format(key)
+            )
+    expected_versions = []
+    for heading in roadmap_guard["orderedReleaseHeadings"]:
+        match = re.fullmatch(
+            r"(v[0-9]+\.[0-9]+\.[0-9]+(?:-rc\.[0-9]+)?) — .+", heading
+        )
+        if not match:
+            raise ValidatorConfigurationError(
+                "Validation policy contains an invalid roadmap release heading."
+            )
+        expected_versions.append(match.group(1))
+    if len(expected_versions) != len(set(expected_versions)):
+        raise ValidatorConfigurationError(
+            "Validation policy roadmap release versions must be unique."
+        )
+
+    public_content = policy["publicContent"]
+    public_content_keys = (
+        "requiredPaths",
+        "includeGlobs",
+        "requiredSections",
+    )
+    if not isinstance(public_content, dict) or set(public_content) != set(
+        public_content_keys
     ):
         raise ValidatorConfigurationError(
-            "Validation policy roadmapGuard is incomplete."
+            "Validation policy publicContent is incomplete."
         )
+    for key in ("requiredPaths", "includeGlobs"):
+        if not isinstance(public_content[key], list) or not public_content[key]:
+            raise ValidatorConfigurationError(
+                "Validation policy publicContent.{0} must be a non-empty list.".format(
+                    key
+                )
+            )
+    for path in public_content["requiredPaths"]:
+        pure_path = PurePosixPath(str(path))
+        if (
+            not isinstance(path, str)
+            or not path
+            or pure_path.is_absolute()
+            or ".." in pure_path.parts
+        ):
+            raise ValidatorConfigurationError(
+                "Validation policy publicContent contains an invalid required path."
+            )
+    if any(
+        not isinstance(pattern, str) or not pattern
+        for pattern in public_content["includeGlobs"]
+    ):
+        raise ValidatorConfigurationError(
+            "Validation policy publicContent includeGlobs must contain strings."
+        )
+    required_sections = public_content["requiredSections"]
+    if not isinstance(required_sections, dict) or not required_sections:
+        raise ValidatorConfigurationError(
+            "Validation policy publicContent.requiredSections must be an object."
+        )
+    for path, sections in required_sections.items():
+        if (
+            path not in public_content["requiredPaths"]
+            or not isinstance(sections, list)
+            or not sections
+            or any(not isinstance(section, str) or not section for section in sections)
+        ):
+            raise ValidatorConfigurationError(
+                "Validation policy publicContent required sections are invalid."
+            )
     for collection_key in (
         "personalPathPatterns",
         "secretPatterns",
@@ -366,7 +447,7 @@ def load_policy(root: Path) -> Dict[str, Any]:
         expected_source_profiles
     ):
         raise ValidatorConfigurationError(
-            "sourceProfiles must define exactly the two authorized package source files."
+            "sourceProfiles must define exactly the two package source files allowed by policy."
         )
     prohibited_pattern_names = {
         entry["name"] for entry in policy["prohibitedCodePatterns"]
@@ -630,7 +711,7 @@ def check_manifest(context: RepositoryContext) -> List[Finding]:
             finding(
                 check_id,
                 manifest_path,
-                "Unauthorized package dependencies are present.",
+                "Package dependencies are outside the active policy.",
                 "No dependencies",
             )
         )
@@ -869,7 +950,7 @@ def check_structure(context: RepositoryContext) -> List[Finding]:
                     check_id,
                     relative_path,
                     "Future package directory is present: {0}.".format(matched[0]),
-                    "Directory absent until an authorized release",
+                    "Directory absent until its planned implementation release",
                 )
             )
         if relative_path.endswith(".gitkeep"):
@@ -1073,7 +1154,7 @@ def check_constants_only_source(
     ]
 
 
-def authorized_editor_window_lines() -> Tuple[str, ...]:
+def expected_editor_window_lines() -> Tuple[str, ...]:
     return (
         "using Teyocesu.AvatarDoctor.Editor.Core;",
         "using UnityEditor;",
@@ -1147,12 +1228,12 @@ def check_editor_window_source_profile(
     check_id = "SOURCE"
     findings: List[Finding] = []
     actual_lines = tuple(line.strip() for line in source.splitlines() if line.strip())
-    if actual_lines != authorized_editor_window_lines():
+    if actual_lines != expected_editor_window_lines():
         findings.append(
             finding(
                 check_id,
                 source_path,
-                "Editor window source differs from the exact authorized shell profile.",
+                "Editor window source differs from the exact shell profile.",
                 "Only the approved using directives, constants, lifecycle methods, and UI statements",
             )
         )
@@ -1168,7 +1249,7 @@ def check_editor_window_source_profile(
             finding(
                 check_id,
                 source_path,
-                "Editor window using directives are outside the authorized profile.",
+                "Editor window using directives are outside the active profile.",
                 "Exactly the package Core, UnityEditor, UnityEngine, and UIElements namespaces",
             )
         )
@@ -1183,7 +1264,7 @@ def check_editor_window_source_profile(
             finding(
                 check_id,
                 source_path,
-                "Unauthorized constructed type: {0}.".format(
+                "Constructed type is outside the active profile: {0}.".format(
                     unexpected_new_types[0]
                 ),
                 "GUIContent, Label, Vector2, or VisualElement",
@@ -1215,7 +1296,7 @@ def check_editor_window_source_profile(
             finding(
                 check_id,
                 source_path,
-                "Unauthorized method or constructor invocation: {0}.".format(
+                "Method or constructor invocation is outside the active profile: {0}.".format(
                     unexpected_invocations[0]
                 ),
                 "Only the Editor window shell invocation set",
@@ -1243,7 +1324,7 @@ def check_editor_window_source_profile(
             finding(
                 check_id,
                 source_path,
-                "Unauthorized UI style property: {0}.".format(
+                "UI style property is outside the active profile: {0}.".format(
                     unexpected_style_properties[0]
                 ),
                 "Only layout, spacing, wrapping, and font emphasis",
@@ -1260,7 +1341,7 @@ def check_editor_window_source_profile(
             finding(
                 check_id,
                 source_path,
-                "Functional or graphical control is not authorized: {0}.".format(
+                "Functional or graphical control is outside the active profile: {0}.".format(
                     prohibited_controls.group(0)
                 ),
                 "VisualElement and Label only",
@@ -1268,7 +1349,7 @@ def check_editor_window_source_profile(
         )
     if re.search(r"\bTODO\b", source):
         findings.append(
-            finding(check_id, source_path, "Future-functionality TODO is not authorized.")
+            finding(check_id, source_path, "Future-functionality TODO is outside the active profile.")
         )
     if re.search(
         r"\bstatic\s+(?!void\s+OpenWindow\b)[A-Za-z_][A-Za-z0-9_<>,.?\[\] ]*\s+"
@@ -1276,7 +1357,7 @@ def check_editor_window_source_profile(
         source,
     ):
         findings.append(
-            finding(check_id, source_path, "Mutable static state is not authorized.")
+            finding(check_id, source_path, "Mutable static state is outside the active profile.")
         )
     return findings
 
@@ -1296,14 +1377,14 @@ def check_source(context: RepositoryContext) -> List[Finding]:
     findings: List[Finding] = []
     for missing_path in sorted(expected_source_paths - set(source_paths)):
         findings.append(
-            finding(check_id, missing_path, "Authorized C# source is not tracked.")
+            finding(check_id, missing_path, "Policy-defined C# source is not tracked.")
         )
     for unexpected_path in sorted(set(source_paths) - expected_source_paths):
         findings.append(
             finding(
                 check_id,
                 unexpected_path,
-                "C# source has no authorized file-specific profile.",
+                "C# source has no file-specific policy profile.",
             )
         )
 
@@ -1359,13 +1440,13 @@ def check_source(context: RepositoryContext) -> List[Finding]:
                 finding(
                     check_id,
                     source_path,
-                    "Public C# type declarations are not authorized.",
+                    "Public C# type declarations are outside the active profile.",
                     "Internal types only",
                 )
             )
         if re.search(r"\bunsafe\b", source):
             findings.append(
-                finding(check_id, source_path, "Unsafe C# code is not authorized.")
+                finding(check_id, source_path, "Unsafe C# code is outside the active profile.")
             )
 
         allowed_patterns = (
@@ -1422,7 +1503,7 @@ def check_editor_window(context: RepositoryContext) -> List[Finding]:
             finding(
                 check_id,
                 source_path,
-                "Authorized Editor window source is not tracked.",
+                "Policy-defined Editor window source is not tracked.",
             )
         ]
     try:
@@ -1433,12 +1514,12 @@ def check_editor_window(context: RepositoryContext) -> List[Finding]:
         ]
 
     actual_lines = tuple(line.strip() for line in source.splitlines() if line.strip())
-    if actual_lines != authorized_editor_window_lines():
+    if actual_lines != expected_editor_window_lines():
         findings.append(
             finding(
                 check_id,
                 source_path,
-                "Editor window source differs from the exact authorized shell shape.",
+                "Editor window source differs from the exact shell shape.",
                 "Only the approved declarations and UI statements",
             )
         )
@@ -1553,7 +1634,7 @@ def check_editor_window(context: RepositoryContext) -> List[Finding]:
             finding(
                 check_id,
                 source_path,
-                "Editor window fields differ from the seven authorized constants.",
+                "Editor window fields differ from the seven policy-defined constants.",
                 "Exactly 7 private constants and no mutable fields",
             )
         )
@@ -1585,7 +1666,7 @@ def check_editor_window(context: RepositoryContext) -> List[Finding]:
             finding(
                 check_id,
                 source_path,
-                "Editor window methods differ from the authorized lifecycle.",
+                "Editor window methods differ from the policy-defined lifecycle.",
                 "OpenWindow, OnEnable, and CreateGUI only",
             )
         )
@@ -1726,7 +1807,7 @@ def check_editor_window(context: RepositoryContext) -> List[Finding]:
             finding(
                 check_id,
                 source_path,
-                "Visual elements are not added exactly once in the authorized order.",
+                "Visual elements are not added exactly once in the policy-defined order.",
                 "Heading, status, message, version, then the content container",
             )
         )
@@ -1755,7 +1836,7 @@ def check_editor_window(context: RepositoryContext) -> List[Finding]:
             finding(
                 check_id,
                 source_path,
-                "Unauthorized Editor window token: {0}.".format(
+                "Editor window token is outside the active profile: {0}.".format(
                     prohibited_tokens.group(0)
                 ),
                 "Token absent",
@@ -1770,7 +1851,7 @@ def check_editor_window(context: RepositoryContext) -> List[Finding]:
             finding(
                 check_id,
                 source_path,
-                "File, network, reflection, asynchronous, SDK, or event behavior is not authorized.",
+                "File, network, reflection, asynchronous, SDK, or event behavior is outside the active profile.",
             )
         )
 
@@ -2559,8 +2640,9 @@ def check_workflows(context: RepositoryContext) -> List[Finding]:
     return findings
 
 
-def check_roadmap_guard(context: RepositoryContext) -> List[Finding]:
-    check_id = "ROADMAP_GUARD"
+def validate_roadmap_structure(
+    context: RepositoryContext, check_id: str
+) -> List[Finding]:
     path = "docs/ROADMAP.md"
     if not context.is_tracked(path):
         return [finding(check_id, path, "Roadmap is not tracked.")]
@@ -2570,26 +2652,187 @@ def check_roadmap_guard(context: RepositoryContext) -> List[Finding]:
         return [finding(check_id, path, "Roadmap is not valid UTF-8.")]
     guard = context.policy["roadmapGuard"]
     findings: List[Finding] = []
-    for release in guard["requiredReleases"]:
-        if release not in roadmap:
+
+    actual_stages = re.findall(r"^###\s+(Stage [A-Z] — .+?)\s*$", roadmap, re.MULTILINE)
+    expected_stages = list(guard["requiredStages"])
+    if actual_stages != expected_stages:
+        findings.append(
+            finding(
+                check_id,
+                path,
+                "Roadmap stages do not match the required sequence.",
+                "Exactly {0} ordered stages".format(len(expected_stages)),
+            )
+        )
+
+    release_matches = re.findall(
+        r"^#{2,6}\s+(v[0-9]+\.[0-9]+\.[0-9]+(?:-rc\.[0-9]+)?)\s+—\s+(.+?)\s*$",
+        roadmap,
+        re.MULTILINE,
+    )
+    actual_headings = [
+        "{0} — {1}".format(version, title)
+        for version, title in release_matches
+    ]
+    expected_headings = list(guard["orderedReleaseHeadings"])
+    version_counts: Dict[str, int] = {}
+    for version, _ in release_matches:
+        version_counts[version] = version_counts.get(version, 0) + 1
+    for version in sorted(version_counts):
+        if version_counts[version] > 1:
             findings.append(
                 finding(
                     check_id,
                     path,
-                    "Required roadmap release is missing.",
-                    release,
+                    "Roadmap release version is duplicated: {0}.".format(version),
+                    "One release heading per version",
                 )
             )
-    for boundary in guard["requiredBoundaries"]:
-        if boundary not in roadmap:
+
+    missing_headings = sorted(set(expected_headings) - set(actual_headings))
+    unexpected_headings = sorted(set(actual_headings) - set(expected_headings))
+    for heading in missing_headings:
+        findings.append(
+            finding(
+                check_id,
+                path,
+                "Required roadmap release heading is missing.",
+                heading,
+            )
+        )
+    for heading in unexpected_headings:
+        findings.append(
+            finding(
+                check_id,
+                path,
+                "Unexpected roadmap release heading: {0}.".format(heading),
+                "A heading from the active release sequence",
+            )
+        )
+    if (
+        not missing_headings
+        and not unexpected_headings
+        and actual_headings != expected_headings
+    ):
+        findings.append(
+            finding(
+                check_id,
+                path,
+                "Roadmap release headings are out of order.",
+                "The policy-defined release sequence",
+            )
+        )
+
+    for heading in guard["forbiddenHeadings"]:
+        if heading in roadmap:
             findings.append(
                 finding(
                     check_id,
                     path,
-                    "Required roadmap scope boundary is missing.",
-                    boundary,
+                    "Obsolete roadmap release heading is present: {0}.".format(
+                        heading
+                    ),
+                    "Heading absent",
                 )
             )
+
+    stable_match = re.search(
+        r"^#### v1\.0\.0 — Stable Release\s*$", roadmap, re.MULTILINE
+    )
+    if not stable_match:
+        findings.append(
+            finding(
+                check_id,
+                path,
+                "Stable release definition is missing.",
+                "#### v1.0.0 — Stable Release",
+            )
+        )
+    else:
+        next_heading = re.search(
+            r"^####\s+", roadmap[stable_match.end() :], re.MULTILINE
+        )
+        section_end = (
+            stable_match.end() + next_heading.start()
+            if next_heading
+            else len(roadmap)
+        )
+        stable_section = roadmap[stable_match.end() : section_end]
+        stable_capabilities = re.findall(
+            r"^- (.+?)\s*$", stable_section, re.MULTILINE
+        )
+        if stable_capabilities != guard["requiredStableCapabilities"]:
+            findings.append(
+                finding(
+                    check_id,
+                    path,
+                    "Stable release capabilities do not match the public scope.",
+                    "Exactly {0} ordered capabilities".format(
+                        len(guard["requiredStableCapabilities"])
+                    ),
+                )
+            )
+    return findings
+
+
+def check_roadmap_guard(context: RepositoryContext) -> List[Finding]:
+    return validate_roadmap_structure(context, "ROADMAP_GUARD")
+
+
+def maintained_public_paths(context: RepositoryContext) -> List[str]:
+    configuration = context.policy["publicContent"]
+    paths = set(configuration["requiredPaths"])
+    for relative_path in context.tracked_files:
+        if any(
+            fnmatch.fnmatch(relative_path, pattern)
+            for pattern in configuration["includeGlobs"]
+        ):
+            paths.add(relative_path)
+    return sorted(paths)
+
+
+def check_public_content(context: RepositoryContext) -> List[Finding]:
+    check_id = "PUBLIC_CONTENT"
+    configuration = context.policy["publicContent"]
+    required_sections = configuration["requiredSections"]
+    findings: List[Finding] = []
+
+    for relative_path in maintained_public_paths(context):
+        if not context.is_tracked(relative_path):
+            findings.append(
+                finding(
+                    check_id,
+                    relative_path,
+                    "Required public-content file is not tracked.",
+                    "Tracked UTF-8 text",
+                )
+            )
+            continue
+        try:
+            text = context.read_text(relative_path)
+        except UnicodeDecodeError:
+            findings.append(
+                finding(
+                    check_id,
+                    relative_path,
+                    "Maintained public content is not valid UTF-8.",
+                    "UTF-8",
+                )
+            )
+            continue
+
+        for section in required_sections.get(relative_path, []):
+            if section not in text:
+                findings.append(
+                    finding(
+                        check_id,
+                        relative_path,
+                        "Required public section is missing.",
+                        section,
+                    )
+                )
+
+    findings.extend(validate_roadmap_structure(context, check_id))
     return findings
 
 
@@ -2609,6 +2852,7 @@ CHECKS: Dict[str, Callable[[RepositoryContext], List[Finding]]] = {
     "PROHIBITED_FILES": check_prohibited_files,
     "WORKFLOWS": check_workflows,
     "ROADMAP_GUARD": check_roadmap_guard,
+    "PUBLIC_CONTENT": check_public_content,
 }
 
 
