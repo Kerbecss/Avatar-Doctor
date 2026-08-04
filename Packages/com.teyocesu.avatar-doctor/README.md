@@ -4,13 +4,18 @@ Avatar Doctor is a planned local-first Unity Editor package for explainable VRCh
 
 ## Status
 
-Avatar Doctor is **pre-alpha**. Version `0.0.3` retains the Editor-only package skeleton and adds deterministic repository validation infrastructure for project development.
+Avatar Doctor is **pre-alpha**. Version `0.0.4` adds the first code-only UI Toolkit Editor window shell. Open it through `Tools → Avatar Doctor`.
 
-The repository validator checks tracked project structure, metadata, policy, and text hygiene. It is not part of the planned avatar diagnostic engine, does not compile Unity, and does not provide functional avatar tooling.
+The window contains no functional controls. It displays, in order:
 
-The package does not contain a Unity Editor window, menus, avatar discovery, scanning, diagnostics, repairs, VRChat SDK integration, Quest conversion, publishing, a runtime assembly, or a public API.
+- `Avatar Doctor`
+- `Pre-alpha - Window shell`
+- `Avatar analysis is not available in this version.`
+- `Version 0.0.4`
 
-Version `0.0.3` is not recommended for production projects and is not installable through VCC. Its manifest does not yet point to a distributable ZIP, and no VPM listing or GitHub Pages site is enabled. Artifact and distribution validation belongs to `v0.0.5 — Release Pipeline`.
+The repository validator checks tracked project structure, metadata, policy, source shape, and text hygiene. It is not part of the planned avatar diagnostic engine and does not replace Unity compilation.
+
+The package does not provide avatar discovery, a scanner, diagnostics, repairs, VRChat SDK integration, Quest conversion, publishing, a runtime assembly, or a public API. Version `0.0.4` is not recommended for production projects and is not installable through VCC. Its manifest does not yet point to a distributable ZIP, and no VPM listing or GitHub Pages site is enabled. Artifact and distribution validation belongs to `v0.0.5 — Release Pipeline`.
 
 See the [repository validation guide](../../docs/VALIDATION.md) for local execution and troubleshooting.
 
