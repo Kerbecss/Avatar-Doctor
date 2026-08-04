@@ -2,20 +2,22 @@
 
 ## Status
 
-This document describes the intended architecture of Avatar Doctor. Version `0.0.2` implements only a minimal Editor-only package skeleton. All functional modules described below remain **not implemented**.
+This document describes the intended architecture of Avatar Doctor. Version `0.0.4` implements an Editor-only package shell with one visible UI Toolkit window. All avatar-processing modules described below remain **not implemented**.
 
 ## Current implementation state
 
-### Implemented in v0.0.2
+### Implemented through v0.0.4
 
 - One Editor-only assembly: `Teyocesu.AvatarDoctor.Editor`.
 - Stable root namespace: `Teyocesu.AvatarDoctor.Editor`.
 - Internal package identity constants.
-- Initial `Editor/Core` source folder.
+- Deterministic repository validation.
+- One code-only UI Toolkit Editor window shell.
+- One `Tools/Avatar Doctor` menu entry.
+- Domain Reload-safe visual-tree rebuilding through `CreateGUI` and `Clear()`.
 
 ### Not implemented
 
-- Editor window.
 - Avatar discovery.
 - Scanner.
 - Diagnostics.
@@ -24,6 +26,8 @@ This document describes the intended architecture of Avatar Doctor. Version `0.0
 - Quest conversion.
 - Publishing.
 - Avatar Remote.
+
+The current window is a presentation-only shell. It does not access scenes, assets, avatars, or other project data, and it contains no functional controls.
 
 ## System boundary
 
@@ -40,10 +44,11 @@ Avatar-Doctor/
 ├── Packages/
 │   └── com.teyocesu.avatar-doctor/
 │       ├── Editor/
-│       │   ├── Teyocesu.AvatarDoctor.Editor.asmdef  # Implemented in v0.0.2
-│       │   ├── Core/                                # Initial skeleton in v0.0.2
+│       │   ├── Teyocesu.AvatarDoctor.Editor.asmdef  # Implemented
+│       │   ├── Core/                                # Implemented
 │       │   │   └── AvatarDoctorPackageInfo.cs
-│       │   ├── UI/                                  # Future
+│       │   ├── UI/                                  # Window shell implemented
+│       │   │   └── AvatarDoctorWindow.cs
 │       │   ├── Scanning/                            # Future
 │       │   ├── Diagnostics/                         # Future
 │       │   ├── Rules/                               # Future
@@ -80,7 +85,7 @@ The Unity package is expected to keep analysis separate from mutation:
 8. **UI** will present results and navigation while remaining decoupled from the rule engine.
 9. **Integrations** will expose optional adapters for installed third-party tools without modifying their generated outputs or redistributing their assets.
 
-None of these functional layers is implemented in `v0.0.2`; the current Editor-only assembly contains only the internal package information class described above.
+The `UI` layer currently contains only the non-functional window shell. None of the scanning, diagnostic, repair, Quest, publishing, or integration behavior described above is implemented in `v0.0.4`. The Editor-only assembly contains the internal package information class and the internal window class only.
 
 ## Deterministic expert system
 
@@ -122,7 +127,7 @@ The two subsystems may share documented data contracts in the future, but Avatar
 
 ## VPM packaging
 
-Avatar Doctor is planned to become installable through VPM and VRChat Creator Companion after its distribution pipeline is validated. Version `v0.0.2` is not installable through VCC. The package root is:
+Avatar Doctor is planned to become installable through VPM and VRChat Creator Companion after its distribution pipeline is validated. Version `v0.0.4` is not installable through VCC. The package root is:
 
 ```text
 Packages/com.teyocesu.avatar-doctor/

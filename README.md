@@ -3,7 +3,7 @@
 Avatar Doctor is a planned local-first Unity Editor package for explainable diagnostics, safe repairs, Quest conversion, and multi-platform publishing assistance for VRChat avatars.
 
 > [!WARNING]
-> Avatar Doctor is in **pre-alpha**. Version `v0.0.3` adds automated repository validation, but no functional avatar tooling or scanner exists yet. It is not recommended for production use and is not installable through VCC.
+> Avatar Doctor is in **pre-alpha**. Version `v0.0.4` adds the first Unity Editor window, but it is only a non-functional shell. It does not discover or analyze avatars, is not recommended for production use, and is not installable through VCC.
 
 ## Vision
 
@@ -17,7 +17,7 @@ Avatar Doctor is planned to help avatar creators:
 - validate and publish both platforms under the same Avatar ID; and
 - later use a separate local mobile interface for VRChat OSC controls.
 
-These capabilities are roadmap goals, not features available in version `0.0.3`.
+These capabilities are roadmap goals, not features available in version `0.0.4`.
 
 ## Core principles
 
@@ -37,9 +37,11 @@ Blender, external rigging, weight painting, modeling, vertex modification, and m
 
 ## Current repository status
 
-Release `v0.0.3` adds a deterministic standard-library-only repository validator, a versioned validation policy, a read-only GitHub Actions check, and local validation documentation. These development safeguards validate repository structure and consistency; they do not compile Unity or provide avatar functionality.
+Release `v0.0.4` adds the first code-only UI Toolkit Editor window. Open it through `Tools → Avatar Doctor`. The window displays the package name, pre-alpha shell status, unavailable-analysis message, and package version. It contains no functional controls and safely rebuilds its visual tree after Unity invokes `CreateGUI` again.
 
-The package still does not provide a Unity Editor window, menus, avatar discovery, scanning, diagnostics, repairs, VRChat SDK integration, Quest conversion, publishing, a runtime assembly, or a public API.
+The repository also includes a deterministic standard-library-only validator, versioned validation policy, read-only GitHub Actions check, and local validation documentation. These development safeguards validate repository structure and consistency; they do not provide avatar functionality.
+
+The package does not discover or analyze avatars. It still provides no scanner, diagnostics, repairs, VRChat SDK integration, Quest conversion, publishing, runtime assembly, or public API.
 
 No distributable ZIP, `.unitypackage`, VPM listing, or GitHub Pages site is available yet. Distribution remains deliberately disabled until `v0.0.5 — Release Pipeline` validates the artifacts, manifest, listing, and publication workflow.
 
