@@ -1,0 +1,31 @@
+name: Repository Validation
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repository-validation-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3df4ab11eba7bda6032a0b82a6bb43b11571feac
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Show Python version
+        run: python3 --version
+      - name: Validate repository
+        run: python3 ci/validate_repository.py --root .
