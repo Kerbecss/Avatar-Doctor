@@ -8,6 +8,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 No unreleased changes.
 
+## [0.0.5] - 2026-08-04
+
+### Added
+
+- Public contribution guidance focused on setup, validation, and Pull Requests.
+- Repository validation for the active public documentation and roadmap structure.
+
+### Changed
+
+- Rewrote public project documentation for users and contributors.
+- Refocused the architecture and roadmap on the Avatar Doctor Unity package.
+- Renumbered unreleased ecosystem and beta milestones after narrowing the active product scope.
+- Replaced internal process notes with conventional contributor and maintainer guidance.
+- Updated package metadata and internal version constants to `0.0.5`.
+- Moved release-pipeline planning to `v0.0.6`.
+
 ## [0.0.4] - 2026-08-04
 
 ### Added
@@ -59,7 +75,8 @@ No unreleased changes.
 - Disabled Unity project analytics settings inherited from the template.
 - Restricted manual release automation to the `main` branch.
 
-[Unreleased]: https://github.com/Teyocesu/Avatar-Doctor/compare/v0.0.4...HEAD
+[Unreleased]: https://github.com/Teyocesu/Avatar-Doctor/compare/v0.0.5...HEAD
+[0.0.5]: https://github.com/Teyocesu/Avatar-Doctor/compare/v0.0.4...v0.0.5
 [0.0.4]: https://github.com/Teyocesu/Avatar-Doctor/compare/v0.0.3...v0.0.4
 [0.0.3]: https://github.com/Teyocesu/Avatar-Doctor/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/Teyocesu/Avatar-Doctor/compare/v0.0.1...v0.0.2
