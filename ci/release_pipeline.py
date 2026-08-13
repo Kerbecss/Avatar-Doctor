@@ -350,7 +350,7 @@ def verify_zip(
 
 
 def expected_artifact_names(expected_version: str) -> list[str]:
-    return ["SHA256SUMS.txt", "package.json", release_zip_name(expected_version)]
+    return sorted(["SHA256SUMS.txt", "package.json", release_zip_name(expected_version)])
 
 
 def verify_checksums(artifact_directory: Path, expected_version: str) -> dict[str, str]:

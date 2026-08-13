@@ -116,6 +116,14 @@ class ReleasePipelineTests(unittest.TestCase):
             for name in pipeline.expected_artifact_names(TEST_VERSION):
                 self.assertEqual((first / name).read_bytes(), (second / name).read_bytes())
 
+    def test_built_artifacts_pass_verification(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            temp = Path(temporary)
+            root = self.create_repository(temp)
+            output = temp / "artifacts"
+            self.build(root, output)
+            pipeline.verify_artifacts(root, output, TEST_VERSION)
+
     def test_file_creation_order_does_not_change_build(self) -> None:
         with tempfile.TemporaryDirectory() as first_temporary, tempfile.TemporaryDirectory() as second_temporary:
             first_temp = Path(first_temporary)
