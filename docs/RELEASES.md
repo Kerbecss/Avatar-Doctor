@@ -43,7 +43,7 @@ Publication remains a deliberate human action. The artifact workflow does not cr
 
 ## Post-publication verification
 
-After the prerelease asset exists, run `Build VPM Verification Listing` for `0.0.6` on `main`. The workflow generates a non-public local listing and requires exactly one Avatar Doctor version entry with:
+After the prerelease asset exists, run `Build VPM Verification Listing` for `0.0.6` on `main`. The upstream listing builder may discover multiple installable versions from release history. The normalization step selects only the requested `expected_version` and writes a non-public local `index.json` that intentionally contains one Avatar Doctor release with:
 
 - package ID `com.teyocesu.avatar-doctor`;
 - version `0.0.6`;
@@ -52,7 +52,7 @@ After the prerelease asset exists, run `Build VPM Verification Listing` for `0.0
 
 Remote verification downloads the ZIP as untrusted input, compares its SHA-256 with the listing, validates its manifest and archive safety, and compares every entry with the package tree at tag `v0.0.6`.
 
-The resulting `index.json` is a temporary verification artifact. It is not written to `Website`, published through GitHub Pages, or enabled as a public VPM repository.
+Isolating one requested version makes the resulting `index.json` suitable for verifying that release independently of other published versions. It is a temporary verification artifact, not the future public VPM repository. It is not written to `Website`, published through GitHub Pages, or enabled for public VPM distribution.
 
 ## Clean installation
 

@@ -416,7 +416,9 @@ def normalize_listing(input_path: Path, output_path: Path, expected_version: str
     if repository_url is not None and not is_expected_listing_url(repository_url):
         raise PipelineError("Generated listing contains an unexpected repository URL.")
     document.pop("url", None)
-    listing_manifest(document, expected_version)
+    versions = listing_versions(document)
+    manifest = expected_listing_manifest(versions, expected_version)
+    document["packages"][PACKAGE_ID]["versions"] = {expected_version: manifest}
     output_path.parent.mkdir(parents=True, exist_ok=True)
     if output_path.is_symlink():
         raise PipelineError("Listing output cannot be a symbolic link.")
@@ -442,7 +444,7 @@ def is_expected_listing_url(value: Any) -> bool:
     )
 
 
-def listing_manifest(document: Any, expected_version: str) -> dict[str, Any]:
+def listing_versions(document: Any) -> dict[str, Any]:
     if not isinstance(document, dict):
         raise PipelineError("VPM listing must contain a JSON object.")
     if "url" in document:
@@ -454,8 +456,16 @@ def listing_manifest(document: Any, expected_version: str) -> dict[str, Any]:
     if not isinstance(package, dict):
         raise PipelineError("VPM listing package entry must be an object.")
     versions = package.get("versions")
-    if not isinstance(versions, dict) or set(versions) != {expected_version}:
-        raise PipelineError("VPM listing must contain exactly the expected release version.")
+    if not isinstance(versions, dict) or not versions:
+        raise PipelineError("VPM listing versions must be a non-empty object.")
+    return versions
+
+
+def expected_listing_manifest(
+    versions: dict[str, Any], expected_version: str
+) -> dict[str, Any]:
+    if expected_version not in versions:
+        raise PipelineError("VPM listing does not contain the expected release version.")
     manifest = versions[expected_version]
     if not isinstance(manifest, dict):
         raise PipelineError("VPM listing version entry must be a package manifest.")
@@ -464,6 +474,13 @@ def listing_manifest(document: Any, expected_version: str) -> dict[str, Any]:
     if not isinstance(digest, str) or not SHA256_PATTERN.fullmatch(digest):
         raise PipelineError("VPM listing zipSHA256 must be 64 lowercase hexadecimal characters.")
     return manifest
+
+
+def listing_manifest(document: Any, expected_version: str) -> dict[str, Any]:
+    versions = listing_versions(document)
+    if set(versions) != {expected_version}:
+        raise PipelineError("VPM listing must contain exactly the expected release version.")
+    return expected_listing_manifest(versions, expected_version)
 
 
 def download_remote_zip(url: str) -> bytes:

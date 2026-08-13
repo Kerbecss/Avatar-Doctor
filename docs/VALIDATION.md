@@ -138,11 +138,11 @@ Reproducibility validation builds the artifact set twice in separate temporary d
 
 ## Post-publication verification
 
-After the GitHub prerelease and annotated tag exist, the manual listing workflow builds a non-public local VPM listing. The listing must contain exactly `com.teyocesu.avatar-doctor` version `0.0.6`, the expected release ZIP URL, and a lowercase SHA-256 digest.
+After the GitHub prerelease and annotated tag exist, the manual listing workflow builds a non-public local VPM listing. Upstream generation may include multiple installable versions from release history. Normalization selects only the requested `expected_version`, so the final `index.json` intentionally contains exactly one `com.teyocesu.avatar-doctor` release with the expected ZIP URL and a lowercase SHA-256 digest.
 
 Remote verification downloads the published ZIP, compares its digest with `zipSHA256`, and validates the archive, embedded manifest, and exact package tree from the version tag as untrusted input. This network operation is separate from the repository validator, which remains offline.
 
-The generated listing is a verification artifact only. It is not deployed to GitHub Pages and does not enable a public VPM repository.
+This single-release isolation makes the generated listing suitable for validating one release. The file is a verification artifact only, not the future public VPM repository. It is not deployed to GitHub Pages, and public VPM distribution remains disabled.
 
 ## Unity validation
 

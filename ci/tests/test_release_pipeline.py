@@ -276,6 +276,50 @@ class ReleasePipelineTests(unittest.TestCase):
             manifest = document["packages"][pipeline.PACKAGE_ID]["versions"][TEST_VERSION]
             self.assertEqual(manifest["url"], pipeline.release_zip_url(TEST_VERSION))
 
+    def test_listing_normalization_selects_expected_version_from_history(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            temp = Path(temporary)
+            source = temp / "source.json"
+            output = temp / "index.json"
+            self.write_listing(source, digest="b" * 64, top_level_url=True)
+            raw_listing = json.loads(source.read_text(encoding="utf-8"))
+            versions = raw_listing["packages"][pipeline.PACKAGE_ID]["versions"]
+            versions["0.0.5"] = {
+                "name": pipeline.PACKAGE_ID,
+                "displayName": "Avatar Doctor",
+                "version": "0.0.5",
+                "unity": "2022.3",
+                "url": pipeline.release_zip_url("0.0.5"),
+                "zipSHA256": "a" * 64,
+            }
+            source.write_text(json.dumps(raw_listing), encoding="utf-8")
+
+            pipeline.normalize_listing(source, output, TEST_VERSION)
+
+            normalized = json.loads(output.read_text(encoding="utf-8"))
+            self.assertNotIn("url", normalized)
+            self.assertEqual(set(normalized["packages"]), {pipeline.PACKAGE_ID})
+            normalized_versions = normalized["packages"][pipeline.PACKAGE_ID][
+                "versions"
+            ]
+            self.assertEqual(set(normalized_versions), {TEST_VERSION})
+            manifest = normalized_versions[TEST_VERSION]
+            self.assertEqual(manifest["url"], pipeline.release_zip_url(TEST_VERSION))
+            self.assertEqual(manifest["zipSHA256"], "b" * 64)
+
+    def test_listing_normalization_rejects_missing_expected_version(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            temp = Path(temporary)
+            source = temp / "source.json"
+            output = temp / "index.json"
+            self.write_listing(
+                source,
+                version="0.0.5",
+                url=pipeline.release_zip_url("0.0.5"),
+            )
+            with self.assertRaises(pipeline.PipelineError):
+                pipeline.normalize_listing(source, output, TEST_VERSION)
+
     def test_listing_version_mismatch_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "index.json"
