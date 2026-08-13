@@ -23,6 +23,7 @@ PACKAGE_ROOT = PurePosixPath("Packages/com.teyocesu.avatar-doctor")
 REPOSITORY = "Teyocesu/Avatar-Doctor"
 ZIP_TIMESTAMP = (1980, 1, 1, 0, 0, 0)
 ZIP_EXTERNAL_ATTR = 0o100644 << 16
+EXPECTED_LISTING_URL = "https://Teyocesu.github.io/Avatar-Doctor/index.json"
 CHECKSUM_PATTERN = re.compile(r"^([0-9a-f]{64})  ([^/\\]+)$")
 SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 MAX_REMOTE_ZIP_BYTES = 100 * 1024 * 1024
@@ -84,7 +85,9 @@ def load_json_file(path: Path, description: str) -> Any:
         raise PipelineError(f"Cannot read {description}: {error}.") from error
 
 
-def validate_manifest(manifest: Any, expected_version: str) -> None:
+def validate_manifest(
+    manifest: Any, expected_version: str, *, listing_manifest: bool = False
+) -> None:
     if not isinstance(manifest, dict):
         raise PipelineError("package.json must contain a JSON object.")
     if manifest.get("name") != PACKAGE_ID:
@@ -94,6 +97,8 @@ def validate_manifest(manifest: Any, expected_version: str) -> None:
     expected_url = release_zip_url(expected_version)
     if manifest.get("url") != expected_url:
         raise PipelineError(f"Package URL must be {expected_url}.")
+    if not listing_manifest and "zipSHA256" in manifest:
+        raise PipelineError("Package manifest must not contain listing-only zipSHA256.")
 
 
 def validate_archive_name(name: str) -> None:
@@ -136,21 +141,30 @@ def repository_root(root: Path) -> Path:
     return resolved
 
 
-def tracked_package_files(root: Path) -> list[tuple[str, Path]]:
+def tracked_package_files(root: Path) -> list[tuple[str, bytes]]:
     package_prefix = PACKAGE_ROOT.as_posix() + "/"
-    raw_paths = run_git(root, ["ls-files", "-z", "--", PACKAGE_ROOT.as_posix()])
-    entries: list[tuple[str, Path]] = []
+    run_git(root, ["rev-parse", "HEAD^{commit}"])
+    raw_entries = run_git(
+        root,
+        ["ls-tree", "-r", "-z", "--full-tree", "HEAD", "--", PACKAGE_ROOT.as_posix()],
+    )
+    entries: list[tuple[str, bytes]] = []
     seen_names: set[str] = set()
     seen_casefolded: set[str] = set()
-    package_absolute = root.joinpath(*PACKAGE_ROOT.parts).resolve()
 
-    for raw_path in raw_paths.split(b"\0"):
-        if not raw_path:
+    for raw_entry in raw_entries.split(b"\0"):
+        if not raw_entry:
             continue
         try:
+            metadata, raw_path = raw_entry.split(b"\t", 1)
+            mode, object_type, object_id = metadata.decode("ascii").split(" ")
             repository_path = raw_path.decode("utf-8")
-        except UnicodeDecodeError as error:
-            raise PipelineError("A tracked package path is not valid UTF-8.") from error
+        except (UnicodeDecodeError, ValueError) as error:
+            raise PipelineError("Git returned an invalid package tree entry.") from error
+        if object_type != "blob" or mode not in {"100644", "100755"}:
+            if mode == "120000":
+                raise PipelineError(f"Tracked package symlink is not allowed: {repository_path}.")
+            raise PipelineError(f"Tracked package entry is not a regular file: {repository_path}.")
         if not repository_path.startswith(package_prefix):
             raise PipelineError(f"Tracked file is outside the package root: {repository_path}.")
         archive_name = repository_path[len(package_prefix) :]
@@ -160,17 +174,7 @@ def tracked_package_files(root: Path) -> list[tuple[str, Path]]:
             raise PipelineError(f"Duplicate archive path: {archive_name}.")
         seen_names.add(archive_name)
         seen_casefolded.add(folded)
-
-        absolute_path = root.joinpath(*PurePosixPath(repository_path).parts)
-        if absolute_path.is_symlink():
-            raise PipelineError(f"Tracked package symlink is not allowed: {repository_path}.")
-        if not absolute_path.is_file():
-            raise PipelineError(f"Tracked package path is not a regular file: {repository_path}.")
-        try:
-            absolute_path.resolve().relative_to(package_absolute)
-        except ValueError as error:
-            raise PipelineError(f"Tracked file resolves outside the package root: {repository_path}.") from error
-        entries.append((archive_name, absolute_path))
+        entries.append((archive_name, run_git(root, ["cat-file", "blob", object_id])))
 
     entries.sort(key=lambda entry: entry[0])
     if not entries:
@@ -180,13 +184,18 @@ def tracked_package_files(root: Path) -> list[tuple[str, Path]]:
     return entries
 
 
-def prepare_output_directory(output_directory: Path) -> Path:
+def prepare_output_directory(root: Path, output_directory: Path) -> Path:
     output_directory.mkdir(parents=True, exist_ok=True)
     if output_directory.is_symlink() or not output_directory.is_dir():
         raise PipelineError("The artifact output path must be a regular directory.")
     if any(output_directory.iterdir()):
         raise PipelineError("The artifact output directory must be empty.")
-    return output_directory.resolve()
+    resolved = output_directory.resolve()
+    try:
+        resolved.relative_to(root)
+    except ValueError:
+        return resolved
+    raise PipelineError("Release artifacts must be built outside the repository.")
 
 
 def zip_info(name: str) -> zipfile.ZipInfo:
@@ -194,6 +203,8 @@ def zip_info(name: str) -> zipfile.ZipInfo:
     # Stored entries avoid compressor-version differences between Python runtimes.
     info.compress_type = zipfile.ZIP_STORED
     info.create_system = 3
+    info.create_version = 20
+    info.extract_version = 20
     info.external_attr = ZIP_EXTERNAL_ATTR
     info.internal_attr = 0
     info.extra = b""
@@ -201,20 +212,30 @@ def zip_info(name: str) -> zipfile.ZipInfo:
     return info
 
 
+def canonical_zip_bytes(entries: Sequence[tuple[str, bytes]]) -> bytes:
+    stream = io.BytesIO()
+    with zipfile.ZipFile(
+        stream,
+        mode="w",
+        compression=zipfile.ZIP_STORED,
+        allowZip64=False,
+    ) as archive:
+        archive.comment = b""
+        for archive_name, data in entries:
+            archive.writestr(zip_info(archive_name), data)
+    return stream.getvalue()
+
+
 def build_artifacts(root: Path, output_directory: Path, expected_version: str) -> dict[str, str]:
     root = repository_root(root)
     entries = tracked_package_files(root)
-    manifest_path = dict(entries)["package.json"]
-    manifest_bytes = manifest_path.read_bytes()
+    manifest_bytes = dict(entries)["package.json"]
     validate_manifest(load_json_bytes(manifest_bytes, "package.json"), expected_version)
-    output_directory = prepare_output_directory(output_directory)
+    output_directory = prepare_output_directory(root, output_directory)
 
     zip_name = release_zip_name(expected_version)
     zip_path = output_directory / zip_name
-    with zipfile.ZipFile(zip_path, mode="w", compression=zipfile.ZIP_STORED) as archive:
-        archive.comment = b""
-        for archive_name, source_path in entries:
-            archive.writestr(zip_info(archive_name), source_path.read_bytes())
+    zip_path.write_bytes(canonical_zip_bytes(entries))
 
     manifest_copy = output_directory / "package.json"
     manifest_copy.write_bytes(manifest_bytes)
@@ -252,6 +273,8 @@ def validate_zip_infos(infos: Sequence[zipfile.ZipInfo]) -> list[str]:
             raise PipelineError(f"Archive entry is not stored deterministically: {name}.")
         if info.create_system != 3 or info.external_attr != ZIP_EXTERNAL_ATTR:
             raise PipelineError(f"Archive permissions are not normalized: {name}.")
+        if info.create_version != 20 or info.extract_version != 20:
+            raise PipelineError(f"Archive version metadata is not normalized: {name}.")
         if info.extra or info.comment:
             raise PipelineError(f"Archive entry contains variable metadata: {name}.")
         names.append(name)
@@ -265,7 +288,7 @@ def validate_zip_infos(infos: Sequence[zipfile.ZipInfo]) -> list[str]:
 def verify_zip(
     zip_source: Path | bytes,
     expected_version: str,
-    expected_files: Sequence[tuple[str, Path]] | None = None,
+    expected_files: Sequence[tuple[str, bytes]] | None = None,
 ) -> bytes:
     source: Path | io.BytesIO
     source = zip_source if isinstance(zip_source, Path) else io.BytesIO(zip_source)
@@ -279,13 +302,18 @@ def verify_zip(
                 expected_names = [name for name, _ in expected_files]
                 if names != expected_names:
                     raise PipelineError("ZIP entries do not match the tracked package files.")
-                for name, source_path in expected_files:
-                    if archive.read(name) != source_path.read_bytes():
+                for name, source_bytes in expected_files:
+                    if archive.read(name) != source_bytes:
                         raise PipelineError(f"ZIP entry bytes differ from the tracked file: {name}.")
             manifest_bytes = archive.read("package.json")
     except (OSError, zipfile.BadZipFile, RuntimeError) as error:
         raise PipelineError(f"Invalid ZIP archive: {error}.") from error
     validate_manifest(load_json_bytes(manifest_bytes, "ZIP package.json"), expected_version)
+    if expected_files is not None:
+        canonical = canonical_zip_bytes(expected_files)
+        actual = zip_source.read_bytes() if isinstance(zip_source, Path) else zip_source
+        if actual != canonical:
+            raise PipelineError("ZIP bytes do not match the canonical deterministic archive.")
     return manifest_bytes
 
 
@@ -342,17 +370,21 @@ def verify_artifacts(root: Path, artifact_directory: Path, expected_version: str
     manifest_copy = (artifact_directory / "package.json").read_bytes()
     if manifest_copy != manifest_bytes:
         raise PipelineError("Artifact package.json differs from the ZIP manifest.")
-    root_manifest = dict(entries)["package.json"].read_bytes()
+    root_manifest = dict(entries)["package.json"]
     if manifest_copy != root_manifest:
         raise PipelineError("Artifact package.json differs from the tracked manifest.")
     return checksums
 
 
-def normalize_listing(input_path: Path, output_path: Path) -> None:
+def normalize_listing(input_path: Path, output_path: Path, expected_version: str) -> None:
     document = load_json_file(input_path, "VPM listing")
     if not isinstance(document, dict):
         raise PipelineError("VPM listing must contain a JSON object.")
+    repository_url = document.get("url")
+    if repository_url is not None and repository_url != EXPECTED_LISTING_URL:
+        raise PipelineError("Generated listing contains an unexpected repository URL.")
     document.pop("url", None)
+    listing_manifest(document, expected_version)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     if output_path.is_symlink():
         raise PipelineError("Listing output cannot be a symbolic link.")
@@ -377,7 +409,7 @@ def listing_manifest(document: Any, expected_version: str) -> dict[str, Any]:
     manifest = versions[expected_version]
     if not isinstance(manifest, dict):
         raise PipelineError("VPM listing version entry must be a package manifest.")
-    validate_manifest(manifest, expected_version)
+    validate_manifest(manifest, expected_version, listing_manifest=True)
     digest = manifest.get("zipSHA256")
     if not isinstance(digest, str) or not SHA256_PATTERN.fullmatch(digest):
         raise PipelineError("VPM listing zipSHA256 must be 64 lowercase hexadecimal characters.")
@@ -438,6 +470,7 @@ def parser() -> argparse.ArgumentParser:
     )
     normalize_parser.add_argument("--input", type=Path, required=True)
     normalize_parser.add_argument("--output", type=Path, required=True)
+    normalize_parser.add_argument("--expected-version", required=True)
 
     listing_parser = subparsers.add_parser(
         "verify-listing", help="Verify a local VPM listing and optionally its remote ZIP."
@@ -461,7 +494,7 @@ def main(arguments: Iterable[str] | None = None) -> int:
             verify_artifacts(parsed.root, parsed.artifacts_dir, parsed.expected_version)
             print("Release artifact verification passed.")
         elif parsed.command == "normalize-listing":
-            normalize_listing(parsed.input, parsed.output)
+            normalize_listing(parsed.input, parsed.output, parsed.expected_version)
             print("Local VPM listing normalization passed.")
         elif parsed.command == "verify-listing":
             verify_listing(parsed.listing, parsed.expected_version, parsed.remote)

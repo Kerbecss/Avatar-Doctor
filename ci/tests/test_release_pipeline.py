@@ -54,7 +54,10 @@ class ReleasePipelineTests(unittest.TestCase):
             destination.parent.mkdir(parents=True, exist_ok=True)
             destination.write_bytes(data)
         subprocess.run(["git", "init", "-q", str(root)], check=True)
+        subprocess.run(["git", "-C", str(root), "config", "user.name", "Test Author"], check=True)
+        subprocess.run(["git", "-C", str(root), "config", "user.email", "test@example.com"], check=True)
         subprocess.run(["git", "-C", str(root), "add", "--all"], check=True)
+        subprocess.run(["git", "-C", str(root), "commit", "-qm", "test fixture"], check=True)
         return root
 
     def build(self, root: Path, output: Path) -> dict[str, str]:
@@ -88,7 +91,7 @@ class ReleasePipelineTests(unittest.TestCase):
             },
         }
         if top_level_url:
-            listing["url"] = "https://example.invalid/index.json"
+            listing["url"] = pipeline.EXPECTED_LISTING_URL
         path.write_text(json.dumps(listing), encoding="utf-8")
 
     def test_two_builds_are_byte_identical(self) -> None:
@@ -157,6 +160,7 @@ class ReleasePipelineTests(unittest.TestCase):
             except (OSError, NotImplementedError):
                 self.skipTest("Symbolic links are unavailable on this platform.")
             subprocess.run(["git", "-C", str(root), "add", "--all"], check=True)
+            subprocess.run(["git", "-C", str(root), "commit", "-qm", "add symlink"], check=True)
             with self.assertRaises(pipeline.PipelineError):
                 self.build(root, temp / "artifacts")
 
@@ -231,7 +235,7 @@ class ReleasePipelineTests(unittest.TestCase):
             source = temp / "source.json"
             output = temp / "index.json"
             self.write_listing(source, top_level_url=True)
-            pipeline.normalize_listing(source, output)
+            pipeline.normalize_listing(source, output, TEST_VERSION)
             document = json.loads(output.read_text(encoding="utf-8"))
             self.assertNotIn("url", document)
             manifest = document["packages"][pipeline.PACKAGE_ID]["versions"][TEST_VERSION]
