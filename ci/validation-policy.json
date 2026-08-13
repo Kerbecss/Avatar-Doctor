@@ -3,6 +3,8 @@
   "packageRoot": "Packages/com.teyocesu.avatar-doctor",
   "expectedVersion": "0.0.5",
   "previousVersion": "0.0.4",
+  "releaseDate": "2026-08-04",
+  "expectedPackageUrl": "",
   "expectedIdentity": {
     "packageId": "com.teyocesu.avatar-doctor",
     "displayName": "Avatar Doctor",
@@ -16,10 +18,14 @@
     "license": "MIT"
   },
   "requiredRootFiles": [
+    ".github/workflows/build-listing.yml",
+    ".github/workflows/release.yml",
     ".github/workflows/validate.yml",
     "CONTRIBUTING.md",
     "LICENSE",
     "README.md",
+    "ci/release_pipeline.py",
+    "ci/tests/test_release_pipeline.py",
     "ci/validate_repository.py",
     "ci/validation-policy.json",
     "docs/ARCHITECTURE.md",
@@ -203,18 +209,6 @@
     "ci/validation-policy.json"
   ],
   "legacyTextHygieneExceptions": {
-    ".github/workflows/build-listing.yml": {
-      "sha256": "675d49ec2db0c92d10d81eb2dd1aa57cc1237843e9361fbbb73ea993be8a6b2a",
-      "rules": [
-        "trailingWhitespace"
-      ]
-    },
-    ".github/workflows/release.yml": {
-      "sha256": "21d40af131688d03aebf510c68e6a4d6821cf973190de8304100a2831c6c0648",
-      "rules": [
-        "trailingWhitespace"
-      ]
-    },
     "Packages/com.vrchat.core.bootstrap/Editor.meta": {
       "sha256": "97f19978936f58db8663ce7acf381f87df4db6321a88067d86b6bc4e84850621",
       "rules": [
@@ -434,32 +428,46 @@
   "protectedWorkflows": {
     "release": {
       "path": ".github/workflows/release.yml",
-      "sha256": "21d40af131688d03aebf510c68e6a4d6821cf973190de8304100a2831c6c0648",
-      "manualOnly": true,
-      "requiredConditions": [
-        "github.ref == 'refs/heads/main'",
-        "vars.ENABLE_PACKAGE_RELEASE == 'true'"
+      "name": "Build Release Artifacts",
+      "job": "build",
+      "runner": "ubuntu-latest",
+      "timeoutMinutes": 10,
+      "expectedVersion": "0.0.6",
+      "checkout": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+      "uploadArtifact": "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+      "artifactName": "avatar-doctor-v0.0.6-release",
+      "artifactFiles": [
+        "com.teyocesu.avatar-doctor-0.0.6.zip",
+        "package.json",
+        "SHA256SUMS.txt"
       ],
-      "requiredTagTemplate": "v${{ env.version }}"
+      "retentionDays": 7
     },
     "listing": {
       "path": ".github/workflows/build-listing.yml",
-      "sha256": "675d49ec2db0c92d10d81eb2dd1aa57cc1237843e9361fbbb73ea993be8a6b2a",
-      "manualOnly": true,
-      "requiredConditions": [
-        "github.ref == 'refs/heads/main'",
-        "vars.ENABLE_PACKAGE_LISTING == 'true'"
-      ]
+      "name": "Build VPM Verification Listing",
+      "job": "build-listing",
+      "runner": "ubuntu-latest",
+      "timeoutMinutes": 10,
+      "expectedVersion": "0.0.6",
+      "checkout": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+      "uploadArtifact": "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+      "packageListRepository": "vrchat-community/package-list-action",
+      "packageListRef": "cb31c3b5d17d1070d7741c61de2ca1b219224039",
+      "artifactName": "avatar-doctor-v0.0.6-local-vpm-listing",
+      "artifactFile": "index.json",
+      "retentionDays": 7
     },
     "validation": {
       "path": ".github/workflows/validate.yml",
-      "sha256": "61e376a8abebb1a620d096d1422cd2eb466d77cfab5438d26639077b28a86d27",
       "name": "Repository Validation",
       "job": "validate",
       "runner": "ubuntu-latest",
-      "timeoutMinutes": 5,
+      "timeoutMinutes": 10,
+      "expectedVersion": "0.0.6",
       "checkout": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
-      "command": "python3 ci/validate_repository.py --root ."
+      "validatorCommand": "python3 ci/validate_repository.py --root .",
+      "testCommand": "python3 -B -m unittest discover -s ci/tests -p \"test_*.py\""
     }
   },
   "roadmapGuard": {

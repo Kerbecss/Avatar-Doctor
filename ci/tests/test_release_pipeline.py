@@ -11,6 +11,7 @@ import tempfile
 import unittest
 import zipfile
 from pathlib import Path
+from unittest import mock
 
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -55,7 +56,17 @@ class ReleasePipelineTests(unittest.TestCase):
             destination.write_bytes(data)
         subprocess.run(["git", "init", "-q", str(root)], check=True)
         subprocess.run(["git", "-C", str(root), "config", "user.name", "Test Author"], check=True)
-        subprocess.run(["git", "-C", str(root), "config", "user.email", "test@example.com"], check=True)
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(root),
+                "config",
+                "user.email",
+                "80324652+Teyocesu@users.noreply.github.com",
+            ],
+            check=True,
+        )
         subprocess.run(["git", "-C", str(root), "add", "--all"], check=True)
         subprocess.run(["git", "-C", str(root), "commit", "-qm", "test fixture"], check=True)
         return root
@@ -149,6 +160,17 @@ class ReleasePipelineTests(unittest.TestCase):
                 self.assertIn("package.json", archive.namelist())
                 self.assertNotIn(pipeline.PACKAGE_ROOT.as_posix(), archive.namelist())
 
+    def test_untracked_package_file_is_excluded(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            temp = Path(temporary)
+            root = self.create_repository(temp)
+            package = root.joinpath(*pipeline.PACKAGE_ROOT.parts)
+            (package / "untracked.txt").write_text("not released\n", encoding="utf-8")
+            output = temp / "artifacts"
+            self.build(root, output)
+            with zipfile.ZipFile(output / pipeline.release_zip_name(TEST_VERSION)) as archive:
+                self.assertNotIn("untracked.txt", archive.namelist())
+
     def test_source_symlink_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             temp = Path(temporary)
@@ -172,6 +194,11 @@ class ReleasePipelineTests(unittest.TestCase):
                 archive.writestr(pipeline.zip_info("../escape.txt"), b"escape")
             with self.assertRaises(pipeline.PipelineError):
                 pipeline.verify_zip(malicious, TEST_VERSION)
+
+    def test_windows_unsafe_archive_path_is_rejected(self) -> None:
+        for name in ("CON.txt", "trailing. ", "invalid?.txt"):
+            with self.subTest(name=name), self.assertRaises(pipeline.PipelineError):
+                pipeline.validate_archive_name(name)
 
     def test_tampered_zip_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -261,6 +288,49 @@ class ReleasePipelineTests(unittest.TestCase):
             self.write_listing(path, digest="A" * 64)
             with self.assertRaises(pipeline.PipelineError):
                 pipeline.verify_listing(path, TEST_VERSION, False)
+
+    def test_remote_listing_zip_matches_git_tree(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            temp = Path(temporary)
+            root = self.create_repository(temp)
+            artifacts = temp / "artifacts"
+            self.build(root, artifacts)
+            zip_bytes = (artifacts / pipeline.release_zip_name(TEST_VERSION)).read_bytes()
+            listing = temp / "index.json"
+            self.write_listing(listing, digest=pipeline.sha256_bytes(zip_bytes))
+            with mock.patch.object(pipeline, "download_remote_zip", return_value=zip_bytes):
+                pipeline.verify_listing(
+                    listing,
+                    TEST_VERSION,
+                    True,
+                    root=root,
+                    source_ref="HEAD",
+                )
+
+    def test_remote_listing_rejects_extra_zip_entry_with_matching_hash(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            temp = Path(temporary)
+            root = self.create_repository(temp)
+            artifacts = temp / "artifacts"
+            self.build(root, artifacts)
+            altered = temp / "altered.zip"
+            altered.write_bytes(
+                (artifacts / pipeline.release_zip_name(TEST_VERSION)).read_bytes()
+            )
+            with zipfile.ZipFile(altered, "a", compression=zipfile.ZIP_STORED) as archive:
+                archive.writestr(pipeline.zip_info("unexpected.txt"), b"unexpected")
+            zip_bytes = altered.read_bytes()
+            listing = temp / "index.json"
+            self.write_listing(listing, digest=pipeline.sha256_bytes(zip_bytes))
+            with mock.patch.object(pipeline, "download_remote_zip", return_value=zip_bytes):
+                with self.assertRaises(pipeline.PipelineError):
+                    pipeline.verify_listing(
+                        listing,
+                        TEST_VERSION,
+                        True,
+                        root=root,
+                        source_ref="HEAD",
+                    )
 
 
 if __name__ == "__main__":

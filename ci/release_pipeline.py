@@ -12,6 +12,8 @@ import re
 import stat
 import subprocess
 import sys
+import unicodedata
+import urllib.parse
 import urllib.request
 import zipfile
 from pathlib import Path, PurePosixPath
@@ -27,6 +29,14 @@ EXPECTED_LISTING_URL = "https://Teyocesu.github.io/Avatar-Doctor/index.json"
 CHECKSUM_PATTERN = re.compile(r"^([0-9a-f]{64})  ([^/\\]+)$")
 SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 MAX_REMOTE_ZIP_BYTES = 100 * 1024 * 1024
+WINDOWS_RESERVED_NAMES = {
+    "CON",
+    "PRN",
+    "AUX",
+    "NUL",
+    *(f"COM{index}" for index in range(1, 10)),
+    *(f"LPT{index}" for index in range(1, 10)),
+}
 
 
 class PipelineError(Exception):
@@ -109,6 +119,16 @@ def validate_archive_name(name: str) -> None:
     parts = name.split("/")
     if any(part in {"", ".", ".."} for part in parts):
         raise PipelineError(f"Unsafe archive path component in {name!r}.")
+    for part in parts:
+        if unicodedata.normalize("NFC", part) != part:
+            raise PipelineError(f"Archive path is not Unicode-normalized: {name!r}.")
+        if any(character in '<>:"|?*' for character in part):
+            raise PipelineError(f"Archive path is not portable to Windows: {name!r}.")
+        if part.endswith((" ", ".")):
+            raise PipelineError(f"Archive path has an unsafe trailing character: {name!r}.")
+        reserved_stem = part.split(".", 1)[0].upper()
+        if reserved_stem in WINDOWS_RESERVED_NAMES:
+            raise PipelineError(f"Archive path uses a reserved Windows name: {name!r}.")
     pure_name = PurePosixPath(name)
     if pure_name.is_absolute() or ".." in pure_name.parts:
         raise PipelineError(f"Unsafe archive path: {name!r}.")
@@ -141,12 +161,24 @@ def repository_root(root: Path) -> Path:
     return resolved
 
 
-def tracked_package_files(root: Path) -> list[tuple[str, bytes]]:
+def tracked_package_files(root: Path, source_ref: str = "HEAD") -> list[tuple[str, bytes]]:
     package_prefix = PACKAGE_ROOT.as_posix() + "/"
-    run_git(root, ["rev-parse", "HEAD^{commit}"])
+    resolved_ref = run_git(
+        root, ["rev-parse", "--verify", f"{source_ref}^{{commit}}"]
+    ).decode("ascii").strip()
+    if not re.fullmatch(r"[0-9a-f]{40}", resolved_ref):
+        raise PipelineError("Git did not resolve the package source to a commit.")
     raw_entries = run_git(
         root,
-        ["ls-tree", "-r", "-z", "--full-tree", "HEAD", "--", PACKAGE_ROOT.as_posix()],
+        [
+            "ls-tree",
+            "-r",
+            "-z",
+            "--full-tree",
+            resolved_ref,
+            "--",
+            PACKAGE_ROOT.as_posix(),
+        ],
     )
     entries: list[tuple[str, bytes]] = []
     seen_names: set[str] = set()
@@ -169,7 +201,7 @@ def tracked_package_files(root: Path) -> list[tuple[str, bytes]]:
             raise PipelineError(f"Tracked file is outside the package root: {repository_path}.")
         archive_name = repository_path[len(package_prefix) :]
         validate_archive_name(archive_name)
-        folded = archive_name.casefold()
+        folded = unicodedata.normalize("NFC", archive_name).casefold()
         if archive_name in seen_names or folded in seen_casefolded:
             raise PipelineError(f"Duplicate archive path: {archive_name}.")
         seen_names.add(archive_name)
@@ -259,7 +291,7 @@ def validate_zip_infos(infos: Sequence[zipfile.ZipInfo]) -> list[str]:
         validate_archive_name(name)
         if info.is_dir() or name.endswith("/"):
             raise PipelineError(f"Directory entries are not allowed: {name}.")
-        folded = name.casefold()
+        folded = unicodedata.normalize("NFC", name).casefold()
         if name in seen or folded in seen_casefolded:
             raise PipelineError(f"Duplicate archive entry: {name}.")
         seen.add(name)
@@ -381,7 +413,7 @@ def normalize_listing(input_path: Path, output_path: Path, expected_version: str
     if not isinstance(document, dict):
         raise PipelineError("VPM listing must contain a JSON object.")
     repository_url = document.get("url")
-    if repository_url is not None and repository_url != EXPECTED_LISTING_URL:
+    if repository_url is not None and not is_expected_listing_url(repository_url):
         raise PipelineError("Generated listing contains an unexpected repository URL.")
     document.pop("url", None)
     listing_manifest(document, expected_version)
@@ -390,6 +422,24 @@ def normalize_listing(input_path: Path, output_path: Path, expected_version: str
         raise PipelineError("Listing output cannot be a symbolic link.")
     rendered = json.dumps(document, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
     output_path.write_text(rendered, encoding="utf-8", newline="\n")
+
+
+def is_expected_listing_url(value: Any) -> bool:
+    if not isinstance(value, str):
+        return False
+    actual = urllib.parse.urlsplit(value)
+    expected = urllib.parse.urlsplit(EXPECTED_LISTING_URL)
+    return (
+        actual.scheme.casefold() == expected.scheme.casefold()
+        and actual.hostname is not None
+        and actual.hostname.casefold() == str(expected.hostname).casefold()
+        and actual.port is None
+        and actual.username is None
+        and actual.password is None
+        and actual.path == expected.path
+        and not actual.query
+        and not actual.fragment
+    )
 
 
 def listing_manifest(document: Any, expected_version: str) -> dict[str, Any]:
@@ -434,18 +484,36 @@ def download_remote_zip(url: str) -> bytes:
     return data
 
 
-def verify_listing(listing_path: Path, expected_version: str, remote: bool) -> dict[str, str]:
+def verify_listing(
+    listing_path: Path,
+    expected_version: str,
+    remote: bool,
+    *,
+    root: Path | None = None,
+    source_ref: str = "HEAD",
+    zip_path: Path | None = None,
+) -> dict[str, str]:
     document = load_json_file(listing_path, "VPM listing")
     manifest = listing_manifest(document, expected_version)
     result = {
         "url": str(manifest["url"]),
         "zipSHA256": str(manifest["zipSHA256"]),
     }
-    if remote:
-        zip_bytes = download_remote_zip(result["url"])
+    if remote and zip_path is not None:
+        raise PipelineError("Choose either remote ZIP verification or a local ZIP, not both.")
+    if remote or zip_path is not None:
+        if root is None:
+            raise PipelineError("ZIP verification requires the repository root.")
+        root = repository_root(root)
+        expected_files = tracked_package_files(root, source_ref)
+        zip_bytes = (
+            download_remote_zip(result["url"])
+            if remote
+            else zip_path.read_bytes()
+        )
         if sha256_bytes(zip_bytes) != result["zipSHA256"]:
-            raise PipelineError("Remote release ZIP does not match listing zipSHA256.")
-        verify_zip(zip_bytes, expected_version)
+            raise PipelineError("Release ZIP does not match listing zipSHA256.")
+        verify_zip(zip_bytes, expected_version, expected_files)
     return result
 
 
@@ -478,6 +546,9 @@ def parser() -> argparse.ArgumentParser:
     listing_parser.add_argument("--listing", type=Path, required=True)
     listing_parser.add_argument("--expected-version", required=True)
     listing_parser.add_argument("--remote", action="store_true")
+    listing_parser.add_argument("--root", type=Path)
+    listing_parser.add_argument("--source-ref", default="HEAD")
+    listing_parser.add_argument("--zip", type=Path)
     return root_parser
 
 
@@ -497,7 +568,14 @@ def main(arguments: Iterable[str] | None = None) -> int:
             normalize_listing(parsed.input, parsed.output, parsed.expected_version)
             print("Local VPM listing normalization passed.")
         elif parsed.command == "verify-listing":
-            verify_listing(parsed.listing, parsed.expected_version, parsed.remote)
+            verify_listing(
+                parsed.listing,
+                parsed.expected_version,
+                parsed.remote,
+                root=parsed.root,
+                source_ref=parsed.source_ref,
+                zip_path=parsed.zip,
+            )
             print("VPM listing verification passed.")
         else:
             raise PipelineError("Unsupported command.")

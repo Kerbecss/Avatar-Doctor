@@ -206,6 +206,8 @@ def load_policy(root: Path) -> Dict[str, Any]:
         "packageRoot",
         "expectedVersion",
         "previousVersion",
+        "releaseDate",
+        "expectedPackageUrl",
         "expectedIdentity",
         "requiredRootFiles",
         "requiredPackageFiles",
@@ -278,12 +280,17 @@ def load_policy(root: Path) -> Dict[str, Any]:
         "packageRoot",
         "expectedVersion",
         "previousVersion",
+        "releaseDate",
         "spanishCharacters",
     ):
         if not isinstance(policy[key], str) or not policy[key]:
             raise ValidatorConfigurationError(
                 "Validation policy key {0} must be a non-empty string.".format(key)
             )
+    if not isinstance(policy["expectedPackageUrl"], str):
+        raise ValidatorConfigurationError(
+            "Validation policy expectedPackageUrl must be a string."
+        )
     identity_keys = (
         "packageId",
         "displayName",
@@ -304,6 +311,12 @@ def load_policy(root: Path) -> Dict[str, Any]:
         raise ValidatorConfigurationError(
             "Validation policy expectedIdentity is incomplete."
         )
+    if not SEMVER_PATTERN.fullmatch(policy["expectedVersion"]) or not SEMVER_PATTERN.fullmatch(
+        policy["previousVersion"]
+    ):
+        raise ValidatorConfigurationError(
+            "Validation policy versions must use simple Semantic Versioning."
+        )
     protected = policy["protectedWorkflows"]
     if not isinstance(protected, dict) or set(protected) != {
         "listing",
@@ -313,18 +326,154 @@ def load_policy(root: Path) -> Dict[str, Any]:
         raise ValidatorConfigurationError(
             "Validation policy protectedWorkflows must define listing, release, and validation."
         )
+    protected_keys = {
+        "release": {
+            "path",
+            "name",
+            "job",
+            "runner",
+            "timeoutMinutes",
+            "expectedVersion",
+            "checkout",
+            "uploadArtifact",
+            "artifactName",
+            "artifactFiles",
+            "retentionDays",
+        },
+        "listing": {
+            "path",
+            "name",
+            "job",
+            "runner",
+            "timeoutMinutes",
+            "expectedVersion",
+            "checkout",
+            "uploadArtifact",
+            "packageListRepository",
+            "packageListRef",
+            "artifactName",
+            "artifactFile",
+            "retentionDays",
+        },
+        "validation": {
+            "path",
+            "name",
+            "job",
+            "runner",
+            "timeoutMinutes",
+            "expectedVersion",
+            "checkout",
+            "validatorCommand",
+            "testCommand",
+        },
+    }
     for workflow_name, configuration in protected.items():
-        if (
-            not isinstance(configuration, dict)
-            or not isinstance(configuration.get("path"), str)
-            or not re.fullmatch(
-                r"[0-9a-f]{64}", str(configuration.get("sha256", ""))
-            )
-        ):
+        if not isinstance(configuration, dict) or set(configuration) != protected_keys[
+            workflow_name
+        ]:
             raise ValidatorConfigurationError(
                 "Protected workflow configuration is incomplete: {0}.".format(
                     workflow_name
                 )
+            )
+        string_keys = protected_keys[workflow_name] - {
+            "artifactFiles",
+            "retentionDays",
+            "timeoutMinutes",
+        }
+        if any(
+            not isinstance(configuration.get(key), str) or not configuration[key]
+            for key in string_keys
+        ):
+            raise ValidatorConfigurationError(
+                "Protected workflow strings are incomplete: {0}.".format(workflow_name)
+            )
+        if (
+            not isinstance(configuration["timeoutMinutes"], int)
+            or configuration["timeoutMinutes"] <= 0
+        ):
+            raise ValidatorConfigurationError(
+                "Protected workflow timeout is invalid: {0}.".format(workflow_name)
+            )
+        workflow_path = PurePosixPath(configuration["path"])
+        if (
+            workflow_path.is_absolute()
+            or ".." in workflow_path.parts
+            or workflow_path.parts[:2] != (".github", "workflows")
+            or workflow_path.suffix.casefold() not in {".yml", ".yaml"}
+            or not SEMVER_PATTERN.fullmatch(configuration["expectedVersion"])
+        ):
+            raise ValidatorConfigurationError(
+                "Protected workflow path or version is invalid: {0}.".format(
+                    workflow_name
+                )
+            )
+        for action_key in ("checkout", "uploadArtifact"):
+            action = configuration.get(action_key)
+            if action is not None and not re.fullmatch(
+                r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+@[0-9a-f]{40}", action
+            ):
+                raise ValidatorConfigurationError(
+                    "Protected workflow action is not pinned to a full commit: {0}.".format(
+                        workflow_name
+                    )
+                )
+    release_configuration = protected["release"]
+    if (
+        not isinstance(release_configuration["artifactFiles"], list)
+        or not release_configuration["artifactFiles"]
+        or len(release_configuration["artifactFiles"])
+        != len(set(release_configuration["artifactFiles"]))
+        or any(
+            not isinstance(value, str)
+            or not value
+            or PurePosixPath(value).name != value
+            for value in release_configuration["artifactFiles"]
+        )
+        or not isinstance(release_configuration["retentionDays"], int)
+        or release_configuration["retentionDays"] <= 0
+    ):
+        raise ValidatorConfigurationError(
+            "Protected release workflow artifact configuration is invalid."
+        )
+    listing_configuration = protected["listing"]
+    if (
+        not re.fullmatch(r"[0-9a-f]{40}", listing_configuration["packageListRef"])
+        or not isinstance(listing_configuration["retentionDays"], int)
+        or listing_configuration["retentionDays"] <= 0
+    ):
+        raise ValidatorConfigurationError(
+            "Protected listing workflow dependency configuration is invalid."
+        )
+    if not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", policy["releaseDate"]):
+        raise ValidatorConfigurationError(
+            "Validation policy releaseDate must use YYYY-MM-DD."
+        )
+    if len({configuration["path"] for configuration in protected.values()}) != 3:
+        raise ValidatorConfigurationError(
+            "Protected workflow paths must be unique."
+        )
+    expected_version_tuple = tuple(
+        int(component) for component in policy["expectedVersion"].split(".")
+    )
+    if expected_version_tuple >= (0, 0, 6):
+        repository_url = identity["repositoryUrl"]
+        package_id = identity["packageId"]
+        expected_package_url = (
+            "{0}/releases/download/v{1}/{2}-{1}.zip".format(
+                repository_url, policy["expectedVersion"], package_id
+            )
+        )
+        if policy["expectedPackageUrl"] != expected_package_url:
+            raise ValidatorConfigurationError(
+                "Validation policy expectedPackageUrl is not the exact release ZIP URL."
+            )
+        if any(
+            configuration["expectedVersion"] != policy["expectedVersion"]
+            for configuration in protected.values()
+        ):
+            raise ValidatorConfigurationError(
+                "Protected workflow versions must match expectedVersion."
             )
     roadmap_guard = policy["roadmapGuard"]
     roadmap_keys = (
@@ -628,6 +777,15 @@ def expected_manifest_urls(policy: Dict[str, Any]) -> Dict[str, str]:
     }
 
 
+def expected_release_zip_url(policy: Dict[str, Any]) -> str:
+    identity = policy["expectedIdentity"]
+    version = policy["expectedVersion"]
+    package_id = identity["packageId"]
+    return "{0}/releases/download/v{1}/{2}-{1}.zip".format(
+        identity["repositoryUrl"], version, package_id
+    )
+
+
 def check_manifest(context: RepositoryContext) -> List[Finding]:
     check_id = "MANIFEST"
     policy = context.policy
@@ -647,7 +805,7 @@ def check_manifest(context: RepositoryContext) -> List[Finding]:
         "displayName": identity["displayName"],
         "unity": identity["unity"],
         "license": identity["license"],
-        "url": "",
+        "url": policy["expectedPackageUrl"],
     }
     expected_values.update(expected_manifest_urls(policy))
     for key, expected_value in expected_values.items():
@@ -776,7 +934,7 @@ def check_version(context: RepositoryContext) -> List[Finding]:
         except UnicodeDecodeError:
             changelog = ""
         required_lines = (
-            "## [{0}] - 2026-08-04".format(expected_version),
+            "## [{0}] - {1}".format(expected_version, policy["releaseDate"]),
             "[Unreleased]: {0}/compare/v{1}...HEAD".format(
                 policy["expectedIdentity"]["repositoryUrl"], expected_version
             ),
@@ -2368,101 +2526,450 @@ def top_level_block(text: str, key: str) -> List[str]:
     return block
 
 
-def check_manual_workflow(
-    context: RepositoryContext, configuration: Dict[str, Any]
+def workflow_step_blocks(text: str) -> List[str]:
+    lines = text.splitlines()
+    starts = [
+        index
+        for index, line in enumerate(lines)
+        if re.match(r"^\s{6}-\s+", line)
+    ]
+    blocks: List[str] = []
+    for position, start in enumerate(starts):
+        end = starts[position + 1] if position + 1 < len(starts) else len(lines)
+        blocks.append("\n".join(lines[start:end]))
+    return blocks
+
+
+def workflow_uses(text: str) -> List[str]:
+    return re.findall(r"^\s*uses:\s*(\S+)\s*$", text, re.MULTILINE)
+
+
+def step_for_action(text: str, action: str) -> List[str]:
+    pattern = re.compile(r"^\s*uses:\s*{0}\s*$".format(re.escape(action)), re.MULTILINE)
+    return [block for block in workflow_step_blocks(text) if pattern.search(block)]
+
+
+def step_with_keys(block: str) -> List[str]:
+    return re.findall(r"^\s{10}([A-Za-z0-9_-]+):", block, re.MULTILINE)
+
+
+def multiline_step_values(block: str, key: str) -> List[str]:
+    lines = block.splitlines()
+    marker = re.compile(r"^(\s+){0}:\s*\|\s*$".format(re.escape(key)))
+    for index, line in enumerate(lines):
+        match = marker.match(line)
+        if not match:
+            continue
+        indentation = len(line) - len(line.lstrip())
+        values: List[str] = []
+        for value_line in lines[index + 1 :]:
+            if not value_line.strip():
+                continue
+            value_indentation = len(value_line) - len(value_line.lstrip())
+            if value_indentation <= indentation:
+                break
+            values.append(value_line.strip())
+        return values
+    return []
+
+
+def append_missing_patterns(
+    findings: List[Finding],
+    path: str,
+    text: str,
+    requirements: Sequence[Tuple[str, str]],
+) -> None:
+    for pattern, description in requirements:
+        if not re.search(pattern, text, re.MULTILINE):
+            findings.append(
+                finding(
+                    "WORKFLOWS",
+                    path,
+                    "Required workflow invariant is missing.",
+                    description,
+                )
+            )
+
+
+def append_forbidden_patterns(
+    findings: List[Finding],
+    path: str,
+    text: str,
+    patterns: Sequence[Tuple[str, str]],
+) -> None:
+    for pattern, description in patterns:
+        if re.search(pattern, text, re.MULTILINE | re.IGNORECASE):
+            findings.append(
+                finding(
+                    "WORKFLOWS",
+                    path,
+                    "Forbidden workflow capability found: {0}.".format(description),
+                    "Capability absent",
+                )
+            )
+
+
+def check_workflow_common(
+    path: str,
+    text: str,
+    configuration: Dict[str, Any],
+    *,
+    manual_only: bool,
 ) -> List[Finding]:
-    check_id = "WORKFLOWS"
-    path = configuration["path"]
-    text, findings = workflow_text(context, check_id, path)
-    if text is None:
-        return findings
-    expected_sha256 = configuration.get("sha256")
-    actual_sha256 = hashlib.sha256(context.read_bytes(path)).hexdigest()
-    if expected_sha256 != actual_sha256:
+    findings: List[Finding] = []
+    if not re.search(
+        r"^name:\s*{0}\s*$".format(re.escape(configuration["name"])),
+        text,
+        re.MULTILINE,
+    ):
+        findings.append(
+            finding("WORKFLOWS", path, "Workflow name does not match policy.", configuration["name"])
+        )
+    if top_level_block(text, "permissions") != ["permissions:", "  contents: read"]:
         findings.append(
             finding(
-                check_id,
+                "WORKFLOWS",
                 path,
-                "Protected distribution workflow differs from the approved base.",
-                "SHA-256 {0}".format(expected_sha256),
+                "Workflow permissions are not exact read-only contents access.",
+                "permissions: contents: read",
             )
         )
-    if top_level_block(text, "on") != ["on:", "  workflow_dispatch:"]:
+    jobs_block = "\n".join(top_level_block(text, "jobs"))
+    job_identifiers = re.findall(r"^\s{2}([A-Za-z0-9_-]+):\s*$", jobs_block, re.MULTILINE)
+    if job_identifiers != [configuration["job"]]:
         findings.append(
             finding(
-                check_id,
+                "WORKFLOWS",
                 path,
-                "Protected distribution workflow triggers are not manual-only.",
-                "on: workflow_dispatch only",
+                "Workflow jobs are not the approved exact set.",
+                configuration["job"],
             )
         )
-    for condition in configuration["requiredConditions"]:
+    append_missing_patterns(
+        findings,
+        path,
+        text,
+        (
+            (
+                r"^\s{{4}}name:\s*{0}\s*$".format(re.escape(configuration["job"])),
+                "job name {0}".format(configuration["job"]),
+            ),
+            (
+                r"^\s{{4}}runs-on:\s*{0}\s*$".format(re.escape(configuration["runner"])),
+                "runner {0}".format(configuration["runner"]),
+            ),
+            (
+                r"^\s{{4}}timeout-minutes:\s*{0}\s*$".format(configuration["timeoutMinutes"]),
+                "timeout-minutes: {0}".format(configuration["timeoutMinutes"]),
+            ),
+            (r"^\s{8}run:\s*python3 --version\s*$", "Python version step"),
+        ),
+    )
+    if manual_only:
+        trigger_block = "\n".join(top_level_block(text, "on"))
+        triggers = re.findall(r"^\s{2}([A-Za-z0-9_-]+):\s*$", trigger_block, re.MULTILINE)
+        input_names = re.findall(r"^\s{6}([A-Za-z0-9_-]+):\s*$", trigger_block, re.MULTILINE)
+        if triggers != ["workflow_dispatch"] or input_names != ["expected_version"]:
+            findings.append(
+                finding(
+                    "WORKFLOWS",
+                    path,
+                    "Distribution workflow is not manual-only with one version input.",
+                    "workflow_dispatch with expected_version only",
+                )
+            )
+        append_missing_patterns(
+            findings,
+            path,
+            trigger_block,
+            (
+                (r"^\s{8}required:\s*true\s*$", "required expected_version input"),
+                (
+                    r"^\s{{8}}default:\s*[\"']?{0}[\"']?\s*$".format(
+                        re.escape(configuration["expectedVersion"])
+                    ),
+                    "expected_version default {0}".format(configuration["expectedVersion"]),
+                ),
+                (r"^\s{8}type:\s*string\s*$", "string expected_version input"),
+            ),
+        )
         if not re.search(
-            r"^[ \t]+if:\s*[^#\n]*{0}[^#\n]*$".format(re.escape(condition)),
+            r"^\s{4}if:\s*github\.ref\s*==\s*'refs/heads/main'\s*$",
             text,
             re.MULTILINE,
         ):
             findings.append(
                 finding(
-                    check_id,
+                    "WORKFLOWS",
                     path,
-                    "Required distribution gate is missing.",
-                    condition,
+                    "Distribution workflow is not restricted exactly to main.",
+                    "github.ref == 'refs/heads/main'",
                 )
             )
-    required_tag = configuration.get("requiredTagTemplate")
-    if required_tag and not re.search(
-        r"^[ \t]+(?:tag|tag_name):\s*[\"']?{0}[\"']?\s*$".format(
-            re.escape(required_tag)
-        ),
+
+    checkout_blocks = step_for_action(text, configuration["checkout"])
+    if not checkout_blocks:
+        findings.append(
+            finding("WORKFLOWS", path, "Pinned repository checkout is missing.", configuration["checkout"])
+        )
+    else:
+        first_checkout = checkout_blocks[0]
+        if step_with_keys(first_checkout) != ["fetch-depth", "persist-credentials"]:
+            findings.append(
+                finding(
+                    "WORKFLOWS",
+                    path,
+                    "Primary checkout settings are not exact.",
+                    "fetch-depth: 0 and persist-credentials: false",
+                )
+            )
+        append_missing_patterns(
+            findings,
+            path,
+            first_checkout,
+            (
+                (r"^\s{10}fetch-depth:\s*0\s*$", "fetch-depth: 0"),
+                (r"^\s{10}persist-credentials:\s*false\s*$", "persist-credentials: false"),
+            ),
+        )
+
+    append_forbidden_patterns(
+        findings,
+        path,
         text,
-        re.MULTILINE,
+        (
+            (r"\bpull_request_target\b", "pull_request_target"),
+            (r"\bworkflow_call\s*:", "reusable workflow trigger"),
+            (r"\bvars\s*\.", "repository variable gate"),
+            (r"\bcontinue-on-error\s*:\s*true\b", "ignored failure"),
+            (r"^[ \t]+permissions\s*:", "job-level permissions"),
+            (r"^[ \t]+[^#\n]+:\s*write\s*$", "write permission"),
+            (r"^permissions\s*:\s*write-all\s*$", "write-all permissions"),
+            (r"\bgit[^\n#]*\s(?:tag|push)(?:\s|$)", "Git tag or push command"),
+            (r"\bgh\s+(?:release\b|api[^\n]*/releases\b)", "GitHub Release command"),
+            (r"api\.github\.com/[^\s]+/releases\b", "GitHub Releases API write"),
+            (r"\bpages\s*:\s*", "Pages permission"),
+            (r"\bid-token\s*:\s*", "identity token permission"),
+            (r"^\s+environment\s*:", "deployment environment"),
+            (r"actions/(?:configure|upload|deploy)-pages", "Pages action"),
+        ),
+    )
+    return findings
+
+
+def check_release_workflow(
+    context: RepositoryContext, configuration: Dict[str, Any]
+) -> List[Finding]:
+    path = configuration["path"]
+    text, findings = workflow_text(context, "WORKFLOWS", path)
+    if text is None:
+        return findings
+    findings.extend(check_workflow_common(path, text, configuration, manual_only=True))
+    expected_uses = [configuration["checkout"], configuration["uploadArtifact"]]
+    if workflow_uses(text) != expected_uses:
+        findings.append(
+            finding(
+                "WORKFLOWS",
+                path,
+                "Release workflow actions are not the approved exact set.",
+                ", ".join(expected_uses),
+            )
+        )
+    append_missing_patterns(
+        findings,
+        path,
+        text,
+        (
+            (re.escape("python3 ci/validate_repository.py --root ."), "repository validator"),
+            (re.escape('python3 -B -m unittest discover -s ci/tests -p "test_*.py"'), "release pipeline tests"),
+            (r"\$RUNNER_TEMP/avatar-doctor-release", "temporary artifact root"),
+            (r"\$GITHUB_STEP_SUMMARY", "release verification summary"),
+            (r"cat \"\$build_a/SHA256SUMS\.txt\"", "verified SHA-256 summary"),
+        ),
+    )
+    command_counts = (
+        (r"^\s*python3 ci/release_pipeline\.py build\b", 2, "two artifact builds"),
+        (r"^\s*python3 ci/release_pipeline\.py verify\b", 2, "two artifact verifications"),
+        (r"^\s*cmp\s+", 3, "three byte comparisons"),
+    )
+    for pattern, expected_count, description in command_counts:
+        if len(re.findall(pattern, text, re.MULTILINE)) != expected_count:
+            findings.append(
+                finding("WORKFLOWS", path, "Release workflow command count is invalid.", description)
+            )
+
+    upload_blocks = step_for_action(text, configuration["uploadArtifact"])
+    if len(upload_blocks) != 1:
+        findings.append(
+            finding("WORKFLOWS", path, "Release workflow must contain one artifact upload.")
+        )
+    else:
+        upload = upload_blocks[0]
+        expected_keys = ["name", "path", "if-no-files-found", "retention-days"]
+        expected_paths = [
+            "${{ runner.temp }}/avatar-doctor-release/build-a/" + name
+            for name in configuration["artifactFiles"]
+        ]
+        if step_with_keys(upload) != expected_keys or multiline_step_values(upload, "path") != expected_paths:
+            findings.append(
+                finding(
+                    "WORKFLOWS",
+                    path,
+                    "Release artifact upload does not contain the exact approved files.",
+                    ", ".join(configuration["artifactFiles"]),
+                )
+            )
+        append_missing_patterns(
+            findings,
+            path,
+            upload,
+            (
+                (r"^\s{{10}}name:\s*{0}\s*$".format(re.escape(configuration["artifactName"])), "release artifact name"),
+                (r"^\s{10}if-no-files-found:\s*error\s*$", "artifact absence failure"),
+                (r"^\s{{10}}retention-days:\s*{0}\s*$".format(configuration["retentionDays"]), "artifact retention"),
+            ),
+        )
+    append_forbidden_patterns(
+        findings,
+        path,
+        text,
+        (
+            (r"\bsecrets\s*\.", "secret reference"),
+            (r"action-create-tag|action-gh-release|create-release|release-action", "tag or Release action"),
+        ),
+    )
+    return findings
+
+
+def check_listing_workflow(
+    context: RepositoryContext, configuration: Dict[str, Any]
+) -> List[Finding]:
+    path = configuration["path"]
+    text, findings = workflow_text(context, "WORKFLOWS", path)
+    if text is None:
+        return findings
+    findings.extend(check_workflow_common(path, text, configuration, manual_only=True))
+    expected_uses = [
+        configuration["checkout"],
+        configuration["checkout"],
+        configuration["uploadArtifact"],
+    ]
+    if workflow_uses(text) != expected_uses:
+        findings.append(
+            finding(
+                "WORKFLOWS",
+                path,
+                "Listing workflow actions are not the approved exact set.",
+                ", ".join(expected_uses),
+            )
+        )
+    checkout_blocks = step_for_action(text, configuration["checkout"])
+    if len(checkout_blocks) != 2:
+        findings.append(
+            finding("WORKFLOWS", path, "Listing workflow must contain two pinned checkouts.")
+        )
+    else:
+        dependency_checkout = checkout_blocks[1]
+        if step_with_keys(dependency_checkout) != [
+            "repository",
+            "ref",
+            "path",
+            "persist-credentials",
+        ]:
+            findings.append(
+                finding(
+                    "WORKFLOWS",
+                    path,
+                    "Listing dependency checkout settings are not exact.",
+                    "repository, ref, path, and disabled credentials",
+                )
+            )
+        append_missing_patterns(
+            findings,
+            path,
+            dependency_checkout,
+            (
+                (r"^\s{{10}}repository:\s*{0}\s*$".format(re.escape(configuration["packageListRepository"])), "package-list repository"),
+                (r"^\s{{10}}ref:\s*{0}\s*$".format(configuration["packageListRef"]), "pinned package-list commit"),
+                (r"^\s{10}path:\s*\.package-list-action\s*$", "isolated package-list checkout"),
+                (r"^\s{10}persist-credentials:\s*false\s*$", "disabled dependency checkout credentials"),
+            ),
+        )
+    append_missing_patterns(
+        findings,
+        path,
+        text,
+        (
+            (re.escape("python3 ci/validate_repository.py --root ."), "repository validator"),
+            (re.escape('python3 -B -m unittest discover -s ci/tests -p "test_*.py"'), "release pipeline tests"),
+            (r"bash \.package-list-action/build\.sh BuildRepoListing", "pinned listing builder"),
+            (r"--current-package-name com\.teyocesu\.avatar-doctor", "exact package identity"),
+            (r"python3 ci/release_pipeline\.py normalize-listing", "local listing normalization"),
+            (r"python3 ci/release_pipeline\.py verify-listing", "local listing verification"),
+            (r"^\s*--root \. \\$", "repository source for ZIP verification"),
+            (r"--source-ref \"refs/tags/v\$EXPECTED_VERSION\"", "version tag source for ZIP verification"),
+            (r"^\s*--remote\s*$", "remote release ZIP verification"),
+            (r"\$RUNNER_TEMP/avatar-doctor-listing", "temporary listing root"),
+            (r"trap 'rm -rf -- \.package-list-action' EXIT", "temporary dependency cleanup"),
+        ),
+    )
+    if len(re.findall(r"\bsecrets\.GITHUB_TOKEN\b", text)) != 1 or re.search(
+        r"\bsecrets\.(?!GITHUB_TOKEN\b)", text
     ):
         findings.append(
             finding(
-                check_id,
+                "WORKFLOWS",
                 path,
-                "Required release tag template is missing.",
-                required_tag,
+                "Listing workflow secret references are not limited to the built-in token.",
+                "secrets.GITHUB_TOKEN once",
             )
         )
+    upload_blocks = step_for_action(text, configuration["uploadArtifact"])
+    if len(upload_blocks) != 1:
+        findings.append(
+            finding("WORKFLOWS", path, "Listing workflow must contain one artifact upload.")
+        )
+    else:
+        upload = upload_blocks[0]
+        expected_path = (
+            "${{ runner.temp }}/avatar-doctor-listing/local/"
+            + configuration["artifactFile"]
+        )
+        if step_with_keys(upload) != ["name", "path", "if-no-files-found", "retention-days"]:
+            findings.append(
+                finding("WORKFLOWS", path, "Listing artifact upload settings are not exact.")
+            )
+        append_missing_patterns(
+            findings,
+            path,
+            upload,
+            (
+                (r"^\s{{10}}name:\s*{0}\s*$".format(re.escape(configuration["artifactName"])), "listing artifact name"),
+                (r"^\s{{10}}path:\s*{0}\s*$".format(re.escape(expected_path)), "local index.json only"),
+                (r"^\s{10}if-no-files-found:\s*error\s*$", "artifact absence failure"),
+                (r"^\s{{10}}retention-days:\s*{0}\s*$".format(configuration["retentionDays"]), "artifact retention"),
+            ),
+        )
+    append_forbidden_patterns(
+        findings,
+        path,
+        text,
+        (
+            (r"(?:^|[/\s])Website(?:/|\s|$)", "tracked Website output"),
+            (r"upload-pages-artifact|deploy-pages|configure-pages", "Pages deployment action"),
+        ),
+    )
     return findings
 
 
 def check_validation_workflow(
     context: RepositoryContext, configuration: Dict[str, Any]
 ) -> List[Finding]:
-    check_id = "WORKFLOWS"
     path = configuration["path"]
-    text, findings = workflow_text(context, check_id, path)
+    text, findings = workflow_text(context, "WORKFLOWS", path)
     if text is None:
         return findings
-
-    actual_sha256 = hashlib.sha256(context.read_bytes(path)).hexdigest()
-    if configuration.get("sha256") != actual_sha256:
-        findings.append(
-            finding(
-                check_id,
-                path,
-                "Validation workflow differs from the versioned approved definition.",
-                "SHA-256 {0}".format(configuration.get("sha256")),
-            )
-        )
-
-    top_level_keys = re.findall(
-        r"^([A-Za-z][A-Za-z0-9_-]*):", text, re.MULTILINE
-    )
-    expected_top_level_keys = ["name", "on", "permissions", "concurrency", "jobs"]
-    if top_level_keys != expected_top_level_keys:
-        findings.append(
-            finding(
-                check_id,
-                path,
-                "Validation workflow top-level structure is not the approved exact set.",
-                ", ".join(expected_top_level_keys),
-            )
-        )
-
+    findings.extend(check_workflow_common(path, text, configuration, manual_only=False))
     expected_triggers = [
         "on:",
         "  pull_request:",
@@ -2474,142 +2981,54 @@ def check_validation_workflow(
     if top_level_block(text, "on") != expected_triggers:
         findings.append(
             finding(
-                check_id,
+                "WORKFLOWS",
                 path,
-                "Validation workflow triggers are not the approved exact set.",
-                "Pull Requests, pushes only to main, and manual dispatch",
+                "Validation triggers are not the approved exact set.",
+                "Pull Requests, pushes to main, and manual dispatch",
             )
         )
-
-    if top_level_block(text, "permissions") != [
-        "permissions:",
-        "  contents: read",
-    ]:
+    if workflow_uses(text) != [configuration["checkout"]]:
         findings.append(
             finding(
-                check_id,
+                "WORKFLOWS",
                 path,
-                "Validation workflow permissions are not read-only contents access.",
-                "permissions: contents: read",
-            )
-        )
-
-    job_identifiers = re.findall(r"^\s{2}([A-Za-z0-9_-]+):\s*$", "\n".join(top_level_block(text, "jobs")), re.MULTILINE)
-    if job_identifiers != [configuration["job"]]:
-        findings.append(
-            finding(
-                check_id,
-                path,
-                "Validation workflow jobs are not the approved exact set: {0}.".format(
-                    ", ".join(job_identifiers) if job_identifiers else "none"
-                ),
-                configuration["job"],
-            )
-        )
-
-    required_patterns = (
-        (r"^name:\s*Repository Validation\s*$", "name: Repository Validation"),
-        (r"^\s{2}pull_request:\s*$", "pull_request trigger"),
-        (r"^\s{2}push:\s*$", "push trigger"),
-        (r"^\s{4}branches:\s*$", "push branches list"),
-        (r"^\s{6}- main\s*$", "push branch main"),
-        (r"^\s{2}workflow_dispatch:\s*$", "workflow_dispatch trigger"),
-        (r"^permissions:\s*$", "top-level permissions"),
-        (r"^\s{2}contents:\s*read\s*$", "contents: read"),
-        (r"^\s{2}validate:\s*$", "validate job identifier"),
-        (r"^\s{4}name:\s*validate\s*$", "validate job name"),
-        (r"^\s{4}runs-on:\s*ubuntu-latest\s*$", "ubuntu-latest runner"),
-        (
-            r"^\s{{4}}timeout-minutes:\s*{0}\s*$".format(
-                configuration["timeoutMinutes"]
-            ),
-            "job timeout",
-        ),
-        (
-            r"^\s{{8}}uses:\s*{0}\s*$".format(re.escape(configuration["checkout"])),
-            "pinned checkout",
-        ),
-        (r"^\s{10}fetch-depth:\s*0\s*$", "fetch-depth: 0"),
-        (
-            r"^\s{10}persist-credentials:\s*false\s*$",
-            "persist-credentials: false",
-        ),
-        (r"^\s{8}run:\s*python3 --version\s*$", "python3 --version step"),
-        (
-            r"^\s{{8}}run:\s*{0}\s*$".format(re.escape(configuration["command"])),
-            "repository validator command",
-        ),
-        (r"^\s{2}cancel-in-progress:\s*true\s*$", "concurrency cancellation"),
-        (
-            r"^\s{2}group:\s*repository-validation-\$\{\{ github\.workflow \}\}-\$\{\{ github\.event\.pull_request\.number \|\| github\.ref \}\}\s*$",
-            "stable validation concurrency group",
-        ),
-    )
-    for pattern, expected in required_patterns:
-        if not re.search(pattern, text, re.MULTILINE):
-            findings.append(
-                finding(
-                    check_id,
-                    path,
-                    "Required validation workflow setting is missing.",
-                    expected,
-                )
-            )
-
-    forbidden_patterns = (
-        (r"\bpull_request_target\b", "pull_request_target"),
-        (r"\bsecrets\s*\.", "secret reference"),
-        (r"\bcontinue-on-error\s*:\s*true\b", "continue-on-error"),
-        (r"^[ \t]+[^#\n]+:\s*write\s*$", "write permission"),
-        (r"^[ \t]+permissions\s*:", "job-level permissions"),
-        (r"^permissions\s*:\s*write-all\s*$", "write-all permission"),
-        (
-            r"^[ \t]+(?:container|defaults|env|environment|services|shell|working-directory)\s*:",
-            "execution-altering setting",
-        ),
-        (r"actions/upload-artifact", "artifact upload"),
-        (r"actions/deploy-pages", "Pages deployment"),
-        (r"\bworkflow_call\s*:", "reusable workflow trigger"),
-    )
-    for pattern, description in forbidden_patterns:
-        if re.search(pattern, text, re.MULTILINE):
-            findings.append(
-                finding(
-                    check_id,
-                    path,
-                    "Forbidden validation workflow setting found: {0}.".format(
-                        description
-                    ),
-                    "Setting absent",
-                )
-            )
-
-    uses_values = re.findall(r"^\s*uses:\s*(\S+)\s*$", text, re.MULTILINE)
-    if uses_values != [configuration["checkout"]]:
-        findings.append(
-            finding(
-                check_id,
-                path,
-                "Validation workflow uses unexpected actions: {0}.".format(
-                    ", ".join(uses_values) if uses_values else "none"
-                ),
+                "Validation workflow uses unexpected actions.",
                 configuration["checkout"],
             )
         )
-
-    run_values = re.findall(r"^\s*run:\s*(.*?)\s*$", text, re.MULTILINE)
-    expected_run_values = ["python3 --version", configuration["command"]]
-    if run_values != expected_run_values:
-        findings.append(
-            finding(
-                check_id,
-                path,
-                "Validation workflow commands are not the approved exact set: {0}.".format(
-                    ", ".join(run_values) if run_values else "none"
-                ),
-                ", ".join(expected_run_values),
+    append_missing_patterns(
+        findings,
+        path,
+        text,
+        (
+            (re.escape(configuration["validatorCommand"]), "repository validator"),
+            (re.escape(configuration["testCommand"]), "release pipeline tests"),
+            (r"\$RUNNER_TEMP/avatar-doctor-validation", "temporary validation artifact root"),
+            (r"Release artifact reproducibility passed\.", "reproducibility result"),
+            (r"^\s{2}cancel-in-progress:\s*true\s*$", "concurrency cancellation"),
+            (r"^\s{2}group:\s*repository-validation-", "stable validation concurrency group"),
+        ),
+    )
+    command_counts = (
+        (r"^\s*python3 ci/release_pipeline\.py build\b", 2, "two artifact builds"),
+        (r"^\s*python3 ci/release_pipeline\.py verify\b", 2, "two artifact verifications"),
+        (r"^\s*cmp\s+", 3, "three byte comparisons"),
+    )
+    for pattern, expected_count, description in command_counts:
+        if len(re.findall(pattern, text, re.MULTILINE)) != expected_count:
+            findings.append(
+                finding("WORKFLOWS", path, "Validation workflow command count is invalid.", description)
             )
-        )
+    append_forbidden_patterns(
+        findings,
+        path,
+        text,
+        (
+            (r"\bsecrets\s*\.", "secret reference"),
+            (r"actions/upload-artifact", "artifact upload"),
+            (r"\benvironment\s*:", "execution environment override"),
+        ),
+    )
     return findings
 
 
@@ -2634,8 +3053,8 @@ def check_workflows(context: RepositoryContext) -> List[Finding]:
                 "Remove it or review and add it deliberately to policy",
             )
         )
-    findings.extend(check_manual_workflow(context, protected["release"]))
-    findings.extend(check_manual_workflow(context, protected["listing"]))
+    findings.extend(check_release_workflow(context, protected["release"]))
+    findings.extend(check_listing_workflow(context, protected["listing"]))
     findings.extend(check_validation_workflow(context, protected["validation"]))
     return findings
 
