@@ -30,6 +30,7 @@
     "ci/validation-policy.json",
     "docs/ARCHITECTURE.md",
     "docs/ROADMAP.md",
+    "docs/RELEASES.md",
     "docs/TECHNICAL_BASELINE.md",
     "docs/VALIDATION.md",
     "docs/WORKFLOW.md"
@@ -580,6 +581,7 @@
       "Packages/com.teyocesu.avatar-doctor/CHANGELOG.md",
       "docs/ARCHITECTURE.md",
       "docs/ROADMAP.md",
+      "docs/RELEASES.md",
       "docs/TECHNICAL_BASELINE.md",
       "docs/VALIDATION.md",
       "docs/WORKFLOW.md"
@@ -655,6 +657,19 @@
         "## Current status",
         "## Released foundation",
         "## Planned releases"
+      ],
+      "docs/RELEASES.md": [
+        "# Release Verification and Recovery",
+        "## Build",
+        "## Pre-publication verification",
+        "## Publication",
+        "## Post-publication verification",
+        "## Clean installation",
+        "## Recovery",
+        "### Failure before publication",
+        "### Failure after merge but before tagging",
+        "### Failure after tagging but before Release publication",
+        "### Failure after publication"
       ],
       "docs/TECHNICAL_BASELINE.md": [
         "# Technical Baseline",

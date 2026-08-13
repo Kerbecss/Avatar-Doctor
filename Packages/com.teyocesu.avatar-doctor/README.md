@@ -4,14 +4,14 @@ Avatar Doctor is an Editor-only Unity package for planned VRChat avatar inspecti
 
 ## Status
 
-Version `0.0.5` is a pre-alpha development release. Open the package window through `Tools → Avatar Doctor`.
+Version `0.0.6` is a pre-alpha development release. Open the package window through `Tools → Avatar Doctor`.
 
 The current code-only UI Toolkit window displays:
 
 - `Avatar Doctor`
 - `Pre-alpha - Window shell`
 - `Avatar analysis is not available in this version.`
-- `Version 0.0.5`
+- `Version 0.0.6`
 
 The window contains no buttons or functional controls. Avatar discovery, scanning, diagnostics, repairs, VRChat SDK integration, Quest preparation, build validation, and publishing are not implemented.
 
@@ -21,13 +21,14 @@ The window contains no buttons or functional controls. Avatar discovery, scannin
 - VCC is the recommended way to open the project on Windows.
 - Python 3 and Git are required to run repository validation.
 
-The package is not yet available from a public VCC listing. Its manifest does not point to a distributable archive, and distribution automation remains disabled until the `v0.0.6` release-pipeline work is reviewed and completed.
+Deterministic VPM release artifacts are supported. The package manifest identifies the versioned prerelease archive, but the package is not yet available from a public VCC listing or public VPM repository. Publication and clean-install verification remain separate, human-controlled release steps.
 
 ## Documentation
 
 - [Project roadmap](../../docs/ROADMAP.md)
 - [Architecture](../../docs/ARCHITECTURE.md)
 - [Repository validation](../../docs/VALIDATION.md)
+- [Release verification and recovery](../../docs/RELEASES.md)
 - [Contribution guide](../../CONTRIBUTING.md)
 
 ## Author

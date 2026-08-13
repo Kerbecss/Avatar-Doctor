@@ -51,7 +51,7 @@ The `--root` value must identify the Git repository root. Without it, the valida
 - `PRIVACY` detects local path formats and unapproved email addresses.
 - `SECRETS` detects a narrow set of high-signal credential patterns.
 - `PROHIBITED_FILES` rejects generated files, operating-system clutter, and archives.
-- `WORKFLOWS` protects distribution gates and the read-only validation workflow.
+- `WORKFLOWS` protects the read-only validation workflow and the manual build and listing-verification workflows.
 - `ROADMAP_GUARD` validates the public roadmap release order, headings, and unique versions.
 - `PUBLIC_CONTENT` validates required public files, sections, contributor guidance, roadmap structure, release ordering, and stable-release scope.
 
@@ -105,9 +105,44 @@ The window profile narrowly authorizes the required UI Toolkit construction. Uni
 
 ## Protected workflow
 
-The validation workflow remains named `Repository Validation`, and its only job remains `validate`. It runs for Pull Requests, pushes to `main`, and manual dispatch with read-only contents permission, disabled checkout credential persistence, and no secrets or artifacts.
+The validation workflow remains named `Repository Validation`, and its only job remains `validate`. It runs for Pull Requests, pushes to `main`, and manual dispatch with read-only contents permission, disabled checkout credential persistence, release-pipeline tests, and reproducibility verification. It does not upload artifacts.
 
 The required status context is `Repository Validation / validate`.
+
+`Build Release Artifacts` is manual, restricted to `main`, and read-only. It validates the repository, runs the release-pipeline tests, compares two independent builds, verifies both artifact sets, and uploads only the ZIP, manifest copy, and checksum file for seven days.
+
+`Build VPM Verification Listing` is also manual, restricted to `main`, and read-only. It uses a pinned listing-builder revision after a prerelease exists, validates the published ZIP against the version tag, and uploads only a non-public local `index.json`. It does not configure Pages or create a deployment.
+
+## Release pipeline validation
+
+Run the unit tests from the repository root:
+
+```shell
+python -m unittest discover -s ci/tests -p "test_*.py"
+```
+
+The release builder accepts an empty output directory outside the repository:
+
+```shell
+python ci/release_pipeline.py build --root . --output-dir <empty-output-directory> --expected-version 0.0.6
+python ci/release_pipeline.py verify --root . --artifacts-dir <empty-output-directory> --expected-version 0.0.6
+```
+
+A valid build contains exactly:
+
+- `com.teyocesu.avatar-doctor-0.0.6.zip`
+- `package.json`
+- `SHA256SUMS.txt`
+
+Reproducibility validation builds the artifact set twice in separate temporary directories and compares all three files byte-for-byte. Verification also compares the ZIP contents with the tracked package files at `HEAD`, validates normalized archive metadata, and rejects missing, additional, unsafe, or altered content.
+
+## Post-publication verification
+
+After the GitHub prerelease and annotated tag exist, the manual listing workflow builds a non-public local VPM listing. The listing must contain exactly `com.teyocesu.avatar-doctor` version `0.0.6`, the expected release ZIP URL, and a lowercase SHA-256 digest.
+
+Remote verification downloads the published ZIP, compares its digest with `zipSHA256`, and validates the archive, embedded manifest, and exact package tree from the version tag as untrusted input. This network operation is separate from the repository validator, which remains offline.
+
+The generated listing is a verification artifact only. It is not deployed to GitHub Pages and does not enable a public VPM repository.
 
 ## Unity validation
 
@@ -122,7 +157,7 @@ Visible validation for the current shell confirms:
 1. Import completes and the Editor assembly compiles without Avatar Doctor errors.
 2. `Tools → Avatar Doctor` opens one window titled `Avatar Doctor`.
 3. The window is dockable and keeps a minimum size of `420 × 220`.
-4. The heading, pre-alpha status, unavailable-analysis message, and `Version 0.0.5` appear once and in order.
+4. The heading, pre-alpha status, unavailable-analysis message, and `Version 0.0.6` appear once and in order.
 5. No buttons or functional controls exist.
 6. Reopening the menu reuses the existing window.
 7. Domain Reload does not duplicate visual elements.
@@ -136,7 +171,7 @@ Repository validation does not:
 - validate VPM or VCC installation;
 - provide complete secret scanning;
 - guarantee natural-language quality;
-- access the network;
+- access the network during repository validation;
 - modify files;
 - publish artifacts; or
 - replace human review.

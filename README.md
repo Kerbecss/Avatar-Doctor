@@ -5,11 +5,11 @@ Avatar Doctor is a Unity Editor package for inspecting VRChat avatars, presentin
 ## Status
 
 - Avatar Doctor is in pre-alpha.
-- The current release is `0.0.5`.
+- The current package version is `0.0.6`.
 - Open the package window through `Tools → Avatar Doctor`.
 - The window is currently a presentation-only shell without avatar analysis.
-- The package is not yet available from a public VCC listing.
-- The release pipeline is planned for `v0.0.6`.
+- Deterministic VPM release artifacts are now supported.
+- The package is not available from a public VCC listing or public VPM repository.
 
 ## Planned capabilities
 
@@ -27,6 +27,8 @@ The package currently provides one Editor-only assembly and one code-only UI Too
 
 The repository also includes deterministic validation for package metadata, source structure, Unity metadata, workflows, public documentation, and roadmap consistency. Avatar discovery, scanning, diagnostics, repairs, SDK integration, Quest preparation, build validation, and publishing are not implemented yet.
 
+The release pipeline builds and verifies a reproducible VPM ZIP, a package manifest copy, and SHA-256 checksums. A separate manual workflow can build a non-public local listing for post-publication verification. These workflows do not create tags, publish Releases, configure GitHub Pages, deploy a public listing, or modify repository contents.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, validation, branch, commit, and Pull Request guidance.
@@ -37,6 +39,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, validation, branch, commit, an
 - [Architecture](docs/ARCHITECTURE.md)
 - [Repository validation](docs/VALIDATION.md)
 - [Development and release workflow](docs/WORKFLOW.md)
+- [Release verification and recovery](docs/RELEASES.md)
 - [Technical baseline](docs/TECHNICAL_BASELINE.md)
 
 ## Author
