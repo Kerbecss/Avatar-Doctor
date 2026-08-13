@@ -2,7 +2,7 @@
 
 ## Current status
 
-Avatar Doctor is at version `0.0.5`. The repository contains public user and contributor documentation, deterministic repository validation, an Editor-only assembly, and a non-functional UI Toolkit window shell available through `Tools → Avatar Doctor`.
+Avatar Doctor package version `0.0.6` is being prepared. The repository contains public user and contributor documentation, deterministic repository validation, an Editor-only assembly, a non-functional UI Toolkit window shell, and a controlled release pipeline for reproducible VPM artifacts and non-public listing verification.
 
 Avatar discovery, scanning, diagnostics, repairs, SDK integration, Quest preparation, build validation, publishing, and public VPM distribution remain planned.
 
@@ -12,7 +12,7 @@ Avatar discovery, scanning, diagnostics, repairs, SDK integration, Quest prepara
 - `v0.0.2` added the Editor-only package skeleton, namespaces, and identity constants.
 - `v0.0.3` added deterministic repository validation and read-only CI.
 - `v0.0.4` added the first Unity Editor window shell and menu entry.
-- `v0.0.5` refocuses public documentation, contributor guidance, roadmap structure, and active package scope.
+- `v0.0.5` refocused public documentation, contributor guidance, roadmap structure, and active package scope.
 
 ## Planned releases
 

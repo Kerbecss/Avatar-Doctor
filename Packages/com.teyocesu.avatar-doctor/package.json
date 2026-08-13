@@ -1,7 +1,7 @@
 {
   "name": "com.teyocesu.avatar-doctor",
   "displayName": "Avatar Doctor",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "unity": "2022.3",
   "description": "Explainable diagnostics, safe repairs, Quest conversion, and multi-platform publishing assistance for VRChat avatars.",
   "author": {
@@ -9,7 +9,7 @@
     "email": "80324652+Teyocesu@users.noreply.github.com",
     "url": "https://github.com/Teyocesu"
   },
-  "url": "",
+  "url": "https://github.com/Teyocesu/Avatar-Doctor/releases/download/v0.0.6/com.teyocesu.avatar-doctor-0.0.6.zip",
   "license": "MIT",
   "licensesUrl": "https://github.com/Teyocesu/Avatar-Doctor/blob/main/LICENSE",
   "changelogUrl": "https://github.com/Teyocesu/Avatar-Doctor/blob/main/Packages/com.teyocesu.avatar-doctor/CHANGELOG.md",

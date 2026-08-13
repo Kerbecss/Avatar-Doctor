@@ -62,20 +62,28 @@ Changes that affect Unity code, metadata, or visible behavior are validated with
 
 ## Merge and release
 
-Releases are prepared from reviewed commits and merged into `main` through a Pull Request. Release preparation includes:
+A release follows this sequence:
 
-1. confirming acceptance criteria and validation evidence;
-2. updating package version references and the changelog;
-3. completing review and required checks;
-4. merging through the protected branch workflow;
-5. creating a versioned tag from the reviewed `main` commit; and
-6. publishing release notes that state capabilities and limitations accurately.
+1. Prepare the scoped changes on a release branch and open a Pull Request.
+2. Complete human review and the required `Repository Validation / validate` check.
+3. Merge the approved Pull Request into `main`.
+4. Manually run `Build Release Artifacts` for the expected version on the reviewed `main` commit.
+5. Verify the uploaded ZIP, manifest, checksums, version, commit, and reproducibility evidence.
+6. Create an annotated version tag on that exact `main` commit.
+7. Publish a GitHub prerelease and attach only the verified release artifacts.
+8. Manually run `Build VPM Verification Listing`.
+9. Verify the published ZIP through the non-public listing.
+10. Perform and record a clean installation on Windows before completing the release.
+
+Publication remains human-controlled. The build workflows do not create tags, publish Releases, push repository changes, deploy Pages, or enable a public listing.
 
 Versions before `v1.0.0` are published as prereleases. Existing tags, Releases, and published history are preserved.
 
 ## Distribution
 
-The current package is not installable from a public VCC listing. Distribution variables, listing generation, GitHub Pages, and package artifacts remain disabled. The release pipeline is planned for `v0.0.6` and will be reviewed separately before distribution is enabled.
+The repository supports deterministic release artifacts and a non-public verification listing. The package is not installable from a public VCC listing, no public VPM repository is enabled, and GitHub Pages remains disabled.
+
+See [Release verification and recovery](RELEASES.md) for artifact verification, publication, clean installation, and failure recovery.
 
 ## Release checklist
 
@@ -85,5 +93,7 @@ The current package is not installable from a public VCC listing. Distribution v
 - Documentation and changelog entries are current.
 - Generated files, credentials, local paths, and unrelated changes are absent.
 - Human review is complete.
-- The package version, tag, and release notes agree.
+- The reviewed commit, package version, ZIP, manifest, checksums, tag, and release notes agree.
+- The published ZIP is verified through the non-public listing.
+- Post-publication clean installation is recorded before release completion.
 - Distribution claims match the functionality that was actually verified.

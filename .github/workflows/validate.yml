@@ -18,7 +18,7 @@ jobs:
   validate:
     name: validate
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -29,3 +29,19 @@ jobs:
         run: python3 --version
       - name: Validate repository
         run: python3 ci/validate_repository.py --root .
+      - name: Test release pipeline
+        run: python3 -B -m unittest discover -s ci/tests -p "test_*.py"
+      - name: Verify release artifact reproducibility
+        run: |
+          set -euo pipefail
+          artifact_root="$RUNNER_TEMP/avatar-doctor-validation"
+          build_a="$artifact_root/build-a"
+          build_b="$artifact_root/build-b"
+          python3 ci/release_pipeline.py build --root . --output-dir "$build_a" --expected-version 0.0.6
+          python3 ci/release_pipeline.py build --root . --output-dir "$build_b" --expected-version 0.0.6
+          cmp "$build_a/com.teyocesu.avatar-doctor-0.0.6.zip" "$build_b/com.teyocesu.avatar-doctor-0.0.6.zip"
+          cmp "$build_a/package.json" "$build_b/package.json"
+          cmp "$build_a/SHA256SUMS.txt" "$build_b/SHA256SUMS.txt"
+          python3 ci/release_pipeline.py verify --root . --artifacts-dir "$build_a" --expected-version 0.0.6
+          python3 ci/release_pipeline.py verify --root . --artifacts-dir "$build_b" --expected-version 0.0.6
+          echo "Release artifact reproducibility passed."

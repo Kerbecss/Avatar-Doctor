@@ -1,88 +1,76 @@
-name: Build Release
+name: Build Release Artifacts
 
-on: 
+on:
   workflow_dispatch:
+    inputs:
+      expected_version:
+        description: Expected package version
+        required: true
+        default: "0.0.6"
+        type: string
+
+permissions:
+  contents: read
 
 jobs:
-
-  # Validate Repository Configuration
-  config:
-    if: github.ref == 'refs/heads/main' && vars.ENABLE_PACKAGE_RELEASE == 'true'
-    runs-on: ubuntu-latest
-    outputs:
-      config_package: ${{ steps.config_package.outputs.configPackage }}
-    steps:
-
-    # Ensure that required repository variable has been created for the Package
-    - name: Validate Package Config
-      id: config_package
-      run: |
-        if [ "${{ vars.PACKAGE_NAME }}" != "" ]; then
-          echo "configPackage=true" >> $GITHUB_OUTPUT;
-        else
-          echo "configPackage=false" >> $GITHUB_OUTPUT;
-        fi
-
-  # Build and release the Package
-  # If the repository is not configured properly, this job will be skipped
   build:
-    needs: config
+    name: build
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    env:
-      packagePath: Packages/${{ vars.PACKAGE_NAME }}
-    if: needs.config.outputs.config_package == 'true'
+    timeout-minutes: 10
     steps:
-
-      # Checkout Local Repository
       - name: Checkout
-        uses: actions/checkout@3df4ab11eba7bda6032a0b82a6bb43b11571feac
-
-      # Get the Package version based on the package.json file
-      - name: Get Version
-        id: version
-        uses: zoexx/github-action-json-file-properties@b9f36ce6ee6fe2680cd3c32b2c62e22eade7e590
-        with: 
-            file_path: "${{ env.packagePath }}/package.json"
-            prop_path: "version"
-    
-      # Configure the Environment Variables needed for releasing the Package
-      - name: Set Environment Variables
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Show Python version
+        run: python3 --version
+      - name: Validate repository
+        run: python3 ci/validate_repository.py --root .
+      - name: Test release pipeline
+        run: python3 -B -m unittest discover -s ci/tests -p "test_*.py"
+      - name: Confirm requested version
+        env:
+          EXPECTED_VERSION: ${{ inputs.expected_version }}
         run: |
-          echo "zipFile=${{ vars.PACKAGE_NAME }}-${{ steps.version.outputs.value }}".zip >> $GITHUB_ENV
-          echo "unityPackage=${{ vars.PACKAGE_NAME }}-${{ steps.version.outputs.value }}.unitypackage" >> $GITHUB_ENV
-          echo "version=${{ steps.version.outputs.value }}" >> $GITHUB_ENV
-
-      # Zip the Package for release
-      - name: Create Package Zip
-        working-directory: "${{ env.packagePath }}"
-        run: zip -r "${{ github.workspace }}/${{ env.zipFile }}" .
-      
-      # Build a list of .meta files for future use
-      - name: Track Package Meta Files
-        run: find "${{ env.packagePath }}/" -name \*.meta >> metaList
-      
-      # Make a UnityPackage version of the Package for release
-      - name: Create UnityPackage
-        uses: pCYSl5EDgo/create-unitypackage@v1.2.3
+          if [ "$EXPECTED_VERSION" != "0.0.6" ]; then
+            echo "expected_version must be 0.0.6." >&2
+            exit 1
+          fi
+      - name: Build and verify reproducible artifacts
+        env:
+          EXPECTED_VERSION: ${{ inputs.expected_version }}
+        run: |
+          set -euo pipefail
+          artifact_root="$RUNNER_TEMP/avatar-doctor-release"
+          build_a="$artifact_root/build-a"
+          build_b="$artifact_root/build-b"
+          python3 ci/release_pipeline.py build --root . --output-dir "$build_a" --expected-version "$EXPECTED_VERSION"
+          python3 ci/release_pipeline.py build --root . --output-dir "$build_b" --expected-version "$EXPECTED_VERSION"
+          cmp "$build_a/com.teyocesu.avatar-doctor-$EXPECTED_VERSION.zip" "$build_b/com.teyocesu.avatar-doctor-$EXPECTED_VERSION.zip"
+          cmp "$build_a/package.json" "$build_b/package.json"
+          cmp "$build_a/SHA256SUMS.txt" "$build_b/SHA256SUMS.txt"
+          python3 ci/release_pipeline.py verify --root . --artifacts-dir "$build_a" --expected-version "$EXPECTED_VERSION"
+          python3 ci/release_pipeline.py verify --root . --artifacts-dir "$build_b" --expected-version "$EXPECTED_VERSION"
+          {
+            echo "## Verified release artifacts"
+            echo
+            echo "- Commit: $GITHUB_SHA"
+            echo "- Version: $EXPECTED_VERSION"
+            echo "- Reproducibility: passed"
+            echo
+            echo '```text'
+            cat "$build_a/SHA256SUMS.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload verified release artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          package-path: ${{ env.unityPackage }}
-          include-files: metaList
-      
-      # Make a release tag of the version from the package.json file 
-      - name: Create Tag
-        id: tag_version
-        uses: rickstaa/action-create-tag@88dbf7ff6fe2405f8e8f6c6fdfd78829bc631f83
-        with:
-          tag: "v${{ env.version }}"
-      
-      # Publish the Release to GitHub
-      - name: Make Release
-        uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844
-        with:
-          files: |
-            ${{ env.zipFile }}
-            ${{ env.unityPackage }}
-            ${{ env.packagePath }}/package.json
-          tag_name: v${{ env.version }}
+          name: avatar-doctor-v0.0.6-release
+          path: |
+            ${{ runner.temp }}/avatar-doctor-release/build-a/com.teyocesu.avatar-doctor-0.0.6.zip
+            ${{ runner.temp }}/avatar-doctor-release/build-a/package.json
+            ${{ runner.temp }}/avatar-doctor-release/build-a/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 7
