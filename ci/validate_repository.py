@@ -457,13 +457,7 @@ def load_policy(root: Path) -> Dict[str, Any]:
         int(component) for component in policy["expectedVersion"].split(".")
     )
     if expected_version_tuple >= (0, 0, 6):
-        repository_url = identity["repositoryUrl"]
-        package_id = identity["packageId"]
-        expected_package_url = (
-            "{0}/releases/download/v{1}/{2}-{1}.zip".format(
-                repository_url, policy["expectedVersion"], package_id
-            )
-        )
+        expected_package_url = expected_release_zip_url(policy)
         if policy["expectedPackageUrl"] != expected_package_url:
             raise ValidatorConfigurationError(
                 "Validation policy expectedPackageUrl is not the exact release ZIP URL."

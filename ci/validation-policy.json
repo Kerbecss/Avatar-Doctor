@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
   "packageRoot": "Packages/com.teyocesu.avatar-doctor",
-  "expectedVersion": "0.0.5",
-  "previousVersion": "0.0.4",
-  "releaseDate": "2026-08-04",
-  "expectedPackageUrl": "",
+  "expectedVersion": "0.0.6",
+  "previousVersion": "0.0.5",
+  "releaseDate": "2026-08-12",
+  "expectedPackageUrl": "https://github.com/Teyocesu/Avatar-Doctor/releases/download/v0.0.6/com.teyocesu.avatar-doctor-0.0.6.zip",
   "expectedIdentity": {
     "packageId": "com.teyocesu.avatar-doctor",
     "displayName": "Avatar Doctor",
@@ -630,7 +630,7 @@
         "## License"
       ],
       "Packages/com.teyocesu.avatar-doctor/CHANGELOG.md": [
-        "## [0.0.5] - 2026-08-04"
+        "## [0.0.6] - 2026-08-12"
       ],
       "docs/ARCHITECTURE.md": [
         "# Avatar Doctor Architecture",

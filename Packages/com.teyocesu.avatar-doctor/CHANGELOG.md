@@ -8,6 +8,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 No unreleased changes.
 
+## [0.0.6] - 2026-08-12
+
+### Added
+
+- Deterministic VPM release artifact building and verification.
+- Release-pipeline unit tests and reproducibility validation.
+- Non-public local VPM listing verification for published release artifacts.
+- Release verification, clean-installation, and recovery documentation.
+
+### Changed
+
+- Hardened the manual release workflow to build read-only GitHub Actions artifacts without publishing.
+- Removed automatic Git tag and GitHub Release creation from the release workflow.
+- Removed GitHub Pages deployment from the listing-verification workflow.
+- Updated package metadata and internal version constants to `0.0.6`.
+
 ## [0.0.5] - 2026-08-04
 
 ### Added
@@ -75,7 +91,8 @@ No unreleased changes.
 - Disabled Unity project analytics settings inherited from the template.
 - Restricted manual release automation to the `main` branch.
 
-[Unreleased]: https://github.com/Teyocesu/Avatar-Doctor/compare/v0.0.5...HEAD
+[Unreleased]: https://github.com/Teyocesu/Avatar-Doctor/compare/v0.0.6...HEAD
+[0.0.6]: https://github.com/Teyocesu/Avatar-Doctor/compare/v0.0.5...v0.0.6
 [0.0.5]: https://github.com/Teyocesu/Avatar-Doctor/compare/v0.0.4...v0.0.5
 [0.0.4]: https://github.com/Teyocesu/Avatar-Doctor/compare/v0.0.3...v0.0.4
 [0.0.3]: https://github.com/Teyocesu/Avatar-Doctor/compare/v0.0.2...v0.0.3
