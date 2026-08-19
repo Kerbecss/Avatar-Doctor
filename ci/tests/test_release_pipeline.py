@@ -17,6 +17,7 @@ from unittest import mock
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import release_pipeline as pipeline  # noqa: E402
+import validate_repository as validator  # noqa: E402
 
 
 TEST_VERSION = "0.0.6"
@@ -69,6 +70,9 @@ class ReleasePipelineTests(unittest.TestCase):
         )
         subprocess.run(["git", "-C", str(root), "add", "--all"], check=True)
         subprocess.run(["git", "-C", str(root), "commit", "-qm", "test fixture"], check=True)
+        subprocess.run(
+            ["git", "-C", str(root), "tag", f"v{TEST_VERSION}"], check=True
+        )
         return root
 
     def build(self, root: Path, output: Path) -> dict[str, str]:
@@ -104,6 +108,40 @@ class ReleasePipelineTests(unittest.TestCase):
         if top_level_url:
             listing["url"] = pipeline.EXPECTED_LISTING_URL
         path.write_text(json.dumps(listing), encoding="utf-8")
+
+    def build_listing_from_local_zip(
+        self, root: Path, output: Path, zip_path: Path
+    ) -> dict[str, str]:
+        return pipeline.build_listing(
+            root,
+            output,
+            TEST_VERSION,
+            f"refs/tags/v{TEST_VERSION}",
+            False,
+            zip_path=zip_path,
+        )
+
+    def listing_workflow_findings(self, text: str) -> list[validator.Finding]:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            relative_path = ".github/workflows/build-listing.yml"
+            workflow_path = root.joinpath(*Path(relative_path).parts)
+            workflow_path.parent.mkdir(parents=True)
+            workflow_path.write_text(text, encoding="utf-8", newline="\n")
+            policy_path = Path(__file__).resolve().parents[1] / "validation-policy.json"
+            policy = json.loads(policy_path.read_text(encoding="utf-8"))
+            context = validator.RepositoryContext(root, policy, [relative_path])
+            return validator.check_listing_workflow(
+                context, policy["protectedWorkflows"]["listing"]
+            )
+
+    def listing_workflow_text(self) -> str:
+        return (
+            Path(__file__).resolve().parents[2]
+            / ".github"
+            / "workflows"
+            / "build-listing.yml"
+        ).read_text(encoding="utf-8")
 
     def test_two_builds_are_byte_identical(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -263,6 +301,190 @@ class ReleasePipelineTests(unittest.TestCase):
             root = self.create_repository(temp, package_id="com.example.invalid")
             with self.assertRaises(pipeline.PipelineError):
                 self.build(root, temp / "artifacts")
+
+    def test_build_listing_is_deterministic(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            temp = Path(temporary)
+            root = self.create_repository(temp)
+            artifacts = temp / "artifacts"
+            self.build(root, artifacts)
+            zip_path = artifacts / pipeline.release_zip_name(TEST_VERSION)
+            first = temp / "first" / "index.json"
+            second = temp / "second" / "index.json"
+
+            self.build_listing_from_local_zip(root, first, zip_path)
+            self.build_listing_from_local_zip(root, second, zip_path)
+
+            self.assertEqual(first.read_bytes(), second.read_bytes())
+            self.assertTrue(first.read_bytes().endswith(b"\n"))
+            self.assertNotIn(b"\r", first.read_bytes())
+
+    def test_build_listing_has_exact_local_verification_shape(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            temp = Path(temporary)
+            root = self.create_repository(temp)
+            artifacts = temp / "artifacts"
+            self.build(root, artifacts)
+            zip_path = artifacts / pipeline.release_zip_name(TEST_VERSION)
+            listing_path = temp / "listing" / "index.json"
+
+            self.build_listing_from_local_zip(root, listing_path, zip_path)
+
+            document = json.loads(listing_path.read_text(encoding="utf-8"))
+            self.assertEqual(
+                set(document), {"author", "id", "name", "packages"}
+            )
+            self.assertNotIn("url", document)
+            self.assertEqual(document["author"], pipeline.VERIFICATION_LISTING_AUTHOR)
+            self.assertEqual(document["id"], pipeline.VERIFICATION_LISTING_ID)
+            self.assertEqual(document["name"], pipeline.VERIFICATION_LISTING_NAME)
+            self.assertEqual(set(document["packages"]), {pipeline.PACKAGE_ID})
+            versions = document["packages"][pipeline.PACKAGE_ID]["versions"]
+            self.assertEqual(set(versions), {TEST_VERSION})
+            manifest = versions[TEST_VERSION]
+            tagged_manifest = pipeline.load_json_bytes(
+                dict(
+                    pipeline.tracked_package_files(
+                        root, f"refs/tags/v{TEST_VERSION}"
+                    )
+                )["package.json"],
+                "tagged package.json",
+            )
+            expected_manifest = dict(tagged_manifest)
+            expected_manifest["zipSHA256"] = pipeline.sha256_file(zip_path)
+            self.assertEqual(manifest, expected_manifest)
+            self.assertEqual(manifest["url"], pipeline.release_zip_url(TEST_VERSION))
+            self.assertRegex(manifest["zipSHA256"], r"^[0-9a-f]{64}$")
+
+    def test_build_listing_rejects_zip_that_does_not_match_tag_tree(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            temp = Path(temporary)
+            root = self.create_repository(temp)
+            artifacts = temp / "artifacts"
+            self.build(root, artifacts)
+            zip_path = artifacts / pipeline.release_zip_name(TEST_VERSION)
+            with zip_path.open("ab") as stream:
+                stream.write(b"tampered")
+            output = temp / "listing" / "index.json"
+
+            with self.assertRaises(pipeline.PipelineError):
+                self.build_listing_from_local_zip(root, output, zip_path)
+
+            self.assertFalse(output.exists())
+
+    def test_build_listing_rejects_wrong_or_missing_source_version(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            temp = Path(temporary)
+            root = self.create_repository(temp)
+            artifacts = temp / "artifacts"
+            self.build(root, artifacts)
+            zip_path = artifacts / pipeline.release_zip_name(TEST_VERSION)
+
+            with self.subTest("wrong source tag"):
+                with self.assertRaises(pipeline.PipelineError):
+                    pipeline.build_listing(
+                        root,
+                        temp / "wrong-source" / "index.json",
+                        TEST_VERSION,
+                        "refs/tags/v0.0.5",
+                        False,
+                        zip_path=zip_path,
+                    )
+
+            subprocess.run(
+                ["git", "-C", str(root), "tag", "-d", f"v{TEST_VERSION}"],
+                check=True,
+                stdout=subprocess.DEVNULL,
+            )
+            with self.subTest("missing expected tag"):
+                with self.assertRaises(pipeline.PipelineError):
+                    self.build_listing_from_local_zip(
+                        root, temp / "missing-tag" / "index.json", zip_path
+                    )
+
+            wrong_version_root = self.create_repository(
+                temp / "wrong-version", version="0.0.5"
+            )
+            with self.subTest("tagged manifest version mismatch"):
+                with self.assertRaises(pipeline.PipelineError):
+                    self.build_listing_from_local_zip(
+                        wrong_version_root,
+                        temp / "wrong-version-listing" / "index.json",
+                        zip_path,
+                    )
+
+    def test_build_listing_requires_exactly_one_zip_source(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            temp = Path(temporary)
+            root = self.create_repository(temp)
+            artifacts = temp / "artifacts"
+            self.build(root, artifacts)
+            zip_path = artifacts / pipeline.release_zip_name(TEST_VERSION)
+            arguments = (
+                root,
+                temp / "listing" / "index.json",
+                TEST_VERSION,
+                f"refs/tags/v{TEST_VERSION}",
+            )
+            with self.assertRaises(pipeline.PipelineError):
+                pipeline.build_listing(*arguments, False)
+            with self.assertRaises(pipeline.PipelineError):
+                pipeline.build_listing(*arguments, True, zip_path=zip_path)
+
+    def test_listing_workflow_self_contained_python_is_accepted(self) -> None:
+        self.assertEqual(self.listing_workflow_findings(self.listing_workflow_text()), [])
+
+    def test_listing_workflow_rejects_external_package_list_action(self) -> None:
+        text = self.listing_workflow_text().replace(
+            "python3 ci/release_pipeline.py build-listing",
+            "bash .package-list-action/build.sh BuildRepoListing",
+            1,
+        )
+        findings = self.listing_workflow_findings(text)
+        self.assertTrue(
+            any("external listing runtime builder" in item.message for item in findings)
+        )
+
+    def test_listing_workflow_rejects_dotnet_invocation(self) -> None:
+        text = self.listing_workflow_text().replace(
+            "python3 ci/release_pipeline.py build-listing",
+            "dotnet run && python3 ci/release_pipeline.py build-listing",
+            1,
+        )
+        findings = self.listing_workflow_findings(text)
+        self.assertTrue(any(".NET listing runtime" in item.message for item in findings))
+
+    def test_listing_workflow_rejects_write_permission(self) -> None:
+        text = self.listing_workflow_text().replace("contents: read", "contents: write", 1)
+        findings = self.listing_workflow_findings(text)
+        self.assertTrue(any("read-only" in item.message for item in findings))
+
+    def test_listing_workflow_rejects_pages_or_deployment(self) -> None:
+        text = self.listing_workflow_text().replace(
+            "    runs-on: ubuntu-latest",
+            "    runs-on: ubuntu-latest\n    environment: github-pages",
+            1,
+        )
+        findings = self.listing_workflow_findings(text)
+        self.assertTrue(any("deployment environment" in item.message for item in findings))
+
+    def test_listing_workflow_rejects_builder_source_ref_without_tag(self) -> None:
+        text = self.listing_workflow_text().replace(
+            '--source-ref "refs/tags/v$EXPECTED_VERSION"',
+            '--source-ref "HEAD"',
+            1,
+        )
+        findings = self.listing_workflow_findings(text)
+        self.assertTrue(any("builder command" in item.message for item in findings))
+
+    def test_listing_workflow_rejects_removed_verifier(self) -> None:
+        text = self.listing_workflow_text().replace(
+            "python3 ci/release_pipeline.py verify-listing",
+            "python3 -c \"print('verification removed')\"",
+            1,
+        )
+        findings = self.listing_workflow_findings(text)
+        self.assertTrue(any("verifier" in item.message for item in findings))
 
     def test_listing_normalization_removes_only_top_level_url(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

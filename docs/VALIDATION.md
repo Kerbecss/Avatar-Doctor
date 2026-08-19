@@ -111,7 +111,7 @@ The required status context is `Repository Validation / validate`.
 
 `Build Release Artifacts` is manual, restricted to `main`, and read-only. It validates the repository, runs the release-pipeline tests, compares two independent builds, verifies both artifact sets, and uploads only the ZIP, manifest copy, and checksum file for seven days.
 
-`Build VPM Verification Listing` is also manual, restricted to `main`, and read-only. It uses a pinned listing-builder revision after a prerelease exists, validates the published ZIP against the version tag, and uploads only a non-public local `index.json`. It does not configure Pages or create a deployment.
+`Build VPM Verification Listing` is also manual, restricted to `main`, and read-only. The repository's standard-library Python pipeline generates the listing from the explicit version tag and published ZIP, an independent command verifies the result, and the workflow uploads only a non-public local `index.json`. It does not use an external .NET listing builder, configure Pages, or create a deployment.
 
 ## Release pipeline validation
 
@@ -138,9 +138,9 @@ Reproducibility validation builds the artifact set twice in separate temporary d
 
 ## Post-publication verification
 
-After the GitHub prerelease and annotated tag exist, the manual listing workflow builds a non-public local VPM listing. Upstream generation may include multiple installable versions from release history. Normalization selects only the requested `expected_version`, so the final `index.json` intentionally contains exactly one `com.teyocesu.avatar-doctor` release with the expected ZIP URL and a lowercase SHA-256 digest.
+After the GitHub prerelease and annotated tag exist, the manual listing workflow builds a non-public local VPM listing directly with `ci/release_pipeline.py build-listing`. Generation reads the full package manifest and package tree from the explicit version tag and accepts the published Release ZIP only when it matches that tree. The deterministic `index.json` intentionally contains exactly one `com.teyocesu.avatar-doctor` release with the expected ZIP URL and a lowercase SHA-256 digest.
 
-Remote verification downloads the published ZIP, compares its digest with `zipSHA256`, and validates the archive, embedded manifest, and exact package tree from the version tag as untrusted input. This network operation is separate from the repository validator, which remains offline.
+The separate `verify-listing` operation downloads the published ZIP again, compares its digest with `zipSHA256`, and validates the archive, embedded manifest, and exact package tree from the version tag as untrusted input. This network operation is separate from both generation and the repository validator, which remains offline. The external listing builder was removed from this verification path after a toolchain and dependency recovery.
 
 This single-release isolation makes the generated listing suitable for validating one release. The file is a verification artifact only, not the future public VPM repository. It is not deployed to GitHub Pages, and public VPM distribution remains disabled.
 

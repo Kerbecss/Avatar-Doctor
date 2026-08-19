@@ -453,8 +453,8 @@
       "expectedVersion": "0.0.6",
       "checkout": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
       "uploadArtifact": "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
-      "packageListRepository": "vrchat-community/package-list-action",
-      "packageListRef": "cb31c3b5d17d1070d7741c61de2ca1b219224039",
+      "buildCommand": "python3 ci/release_pipeline.py build-listing",
+      "verifyCommand": "python3 ci/release_pipeline.py verify-listing",
       "artifactName": "avatar-doctor-v0.0.6-local-vpm-listing",
       "artifactFile": "index.json",
       "retentionDays": 7

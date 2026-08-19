@@ -26,6 +26,9 @@ REPOSITORY = "Teyocesu/Avatar-Doctor"
 ZIP_TIMESTAMP = (1980, 1, 1, 0, 0, 0)
 ZIP_EXTERNAL_ATTR = 0o100644 << 16
 EXPECTED_LISTING_URL = "https://Teyocesu.github.io/Avatar-Doctor/index.json"
+VERIFICATION_LISTING_AUTHOR = "Teyocesu"
+VERIFICATION_LISTING_ID = "com.teyocesu.avatar-doctor.verification"
+VERIFICATION_LISTING_NAME = "Avatar Doctor Verification"
 CHECKSUM_PATTERN = re.compile(r"^([0-9a-f]{64})  ([^/\\]+)$")
 SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 MAX_REMOTE_ZIP_BYTES = 100 * 1024 * 1024
@@ -426,6 +429,111 @@ def normalize_listing(input_path: Path, output_path: Path, expected_version: str
     output_path.write_text(rendered, encoding="utf-8", newline="\n")
 
 
+def expected_listing_source_ref(expected_version: str) -> str:
+    return f"refs/tags/v{expected_version}"
+
+
+def prepare_listing_output(root: Path, output_path: Path) -> Path:
+    if output_path.name in {"", ".", ".."}:
+        raise PipelineError("Listing output must identify an explicit file.")
+    if output_path.is_symlink():
+        raise PipelineError("Listing output cannot be a symbolic link.")
+    if output_path.exists():
+        raise PipelineError("Listing output already exists and will not be overwritten.")
+    try:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+    except OSError as error:
+        raise PipelineError(f"Cannot create the listing output directory: {error}.") from error
+    if output_path.parent.is_symlink() or not output_path.parent.is_dir():
+        raise PipelineError("The listing output directory must be a regular directory.")
+    resolved = output_path.parent.resolve() / output_path.name
+    try:
+        resolved.relative_to(root)
+    except ValueError:
+        return resolved
+    raise PipelineError("The verification listing must be built outside the repository.")
+
+
+def write_new_file(path: Path, data: bytes, description: str) -> None:
+    created = False
+    try:
+        with path.open("xb") as stream:
+            created = True
+            stream.write(data)
+            stream.flush()
+            os.fsync(stream.fileno())
+    except OSError as error:
+        if created:
+            try:
+                path.unlink()
+            except OSError:
+                pass
+        raise PipelineError(f"Cannot write {description}: {error}.") from error
+
+
+def read_local_zip(path: Path) -> bytes:
+    if path.is_symlink() or not path.is_file():
+        raise PipelineError("Local ZIP must be a regular file.")
+    try:
+        if path.stat().st_size > MAX_REMOTE_ZIP_BYTES:
+            raise PipelineError("Local ZIP exceeds the verification size limit.")
+        data = path.read_bytes()
+    except OSError as error:
+        raise PipelineError(f"Cannot read the local ZIP: {error}.") from error
+    if len(data) > MAX_REMOTE_ZIP_BYTES:
+        raise PipelineError("Local ZIP exceeds the verification size limit.")
+    return data
+
+
+def build_listing(
+    root: Path,
+    output_path: Path,
+    expected_version: str,
+    source_ref: str,
+    remote: bool,
+    *,
+    zip_path: Path | None = None,
+) -> dict[str, str]:
+    root = repository_root(root)
+    if source_ref != expected_listing_source_ref(expected_version):
+        raise PipelineError("Listing source must be the explicit expected version tag.")
+    if remote == (zip_path is not None):
+        raise PipelineError("Choose exactly one ZIP source: --remote or --zip.")
+
+    entries = tracked_package_files(root, source_ref)
+    manifest = load_json_bytes(dict(entries)["package.json"], "tagged package.json")
+    validate_manifest(manifest, expected_version)
+    zip_bytes = (
+        download_remote_zip(str(manifest["url"]))
+        if remote
+        else read_local_zip(zip_path)
+    )
+    verify_zip(zip_bytes, expected_version, entries)
+    digest = sha256_bytes(zip_bytes)
+
+    listing_package_manifest = dict(manifest)
+    listing_package_manifest["zipSHA256"] = digest
+    document = {
+        "author": VERIFICATION_LISTING_AUTHOR,
+        "id": VERIFICATION_LISTING_ID,
+        "name": VERIFICATION_LISTING_NAME,
+        "packages": {
+            PACKAGE_ID: {
+                "versions": {
+                    expected_version: listing_package_manifest,
+                }
+            }
+        },
+    }
+    listing_manifest(document, expected_version)
+    rendered = (
+        json.dumps(document, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    ).encode("utf-8")
+    resolved_output = prepare_listing_output(root, output_path)
+    write_new_file(resolved_output, rendered, "verification listing")
+    return {"url": str(manifest["url"]), "zipSHA256": digest}
+
+
 def is_expected_listing_url(value: Any) -> bool:
     if not isinstance(value, str):
         return False
@@ -449,12 +557,21 @@ def listing_versions(document: Any) -> dict[str, Any]:
         raise PipelineError("VPM listing must contain a JSON object.")
     if "url" in document:
         raise PipelineError("Local VPM listing must omit the top-level repository URL.")
+    expected_top_level = {"author", "id", "name", "packages"}
+    if set(document) != expected_top_level:
+        raise PipelineError("Local VPM listing must contain the exact verification fields.")
+    if document.get("author") != VERIFICATION_LISTING_AUTHOR:
+        raise PipelineError("VPM listing author is invalid.")
+    if document.get("id") != VERIFICATION_LISTING_ID:
+        raise PipelineError("VPM listing ID is invalid.")
+    if document.get("name") != VERIFICATION_LISTING_NAME:
+        raise PipelineError("VPM listing name is invalid.")
     packages = document.get("packages")
     if not isinstance(packages, dict) or set(packages) != {PACKAGE_ID}:
         raise PipelineError("VPM listing must contain exactly the Avatar Doctor package.")
     package = packages[PACKAGE_ID]
-    if not isinstance(package, dict):
-        raise PipelineError("VPM listing package entry must be an object.")
+    if not isinstance(package, dict) or set(package) != {"versions"}:
+        raise PipelineError("VPM listing package entry must contain only versions.")
     versions = package.get("versions")
     if not isinstance(versions, dict) or not versions:
         raise PipelineError("VPM listing versions must be a non-empty object.")
@@ -526,7 +643,7 @@ def verify_listing(
         zip_bytes = (
             download_remote_zip(result["url"])
             if remote
-            else zip_path.read_bytes()
+            else read_local_zip(zip_path)
         )
         if sha256_bytes(zip_bytes) != result["zipSHA256"]:
             raise PipelineError("Release ZIP does not match listing zipSHA256.")
@@ -549,6 +666,17 @@ def parser() -> argparse.ArgumentParser:
     verify_parser.add_argument("--root", type=Path, required=True)
     verify_parser.add_argument("--artifacts-dir", type=Path, required=True)
     verify_parser.add_argument("--expected-version", required=True)
+
+    build_listing_parser = subparsers.add_parser(
+        "build-listing", help="Build a deterministic local VPM verification listing."
+    )
+    build_listing_parser.add_argument("--root", type=Path, required=True)
+    build_listing_parser.add_argument("--output", type=Path, required=True)
+    build_listing_parser.add_argument("--expected-version", required=True)
+    build_listing_parser.add_argument("--source-ref", required=True)
+    listing_zip_source = build_listing_parser.add_mutually_exclusive_group(required=True)
+    listing_zip_source.add_argument("--remote", action="store_true")
+    listing_zip_source.add_argument("--zip", type=Path)
 
     normalize_parser = subparsers.add_parser(
         "normalize-listing", help="Normalize a generated listing for local verification."
@@ -581,6 +709,18 @@ def main(arguments: Iterable[str] | None = None) -> int:
         elif parsed.command == "verify":
             verify_artifacts(parsed.root, parsed.artifacts_dir, parsed.expected_version)
             print("Release artifact verification passed.")
+        elif parsed.command == "build-listing":
+            result = build_listing(
+                parsed.root,
+                parsed.output,
+                parsed.expected_version,
+                parsed.source_ref,
+                parsed.remote,
+                zip_path=parsed.zip,
+            )
+            print("Local VPM verification listing build passed.")
+            print(f"Version: {parsed.expected_version}")
+            print(f"ZIP SHA-256: {result['zipSHA256']}")
         elif parsed.command == "normalize-listing":
             normalize_listing(parsed.input, parsed.output, parsed.expected_version)
             print("Local VPM listing normalization passed.")
