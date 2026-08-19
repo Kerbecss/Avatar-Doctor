@@ -349,8 +349,8 @@ def load_policy(root: Path) -> Dict[str, Any]:
             "expectedVersion",
             "checkout",
             "uploadArtifact",
-            "packageListRepository",
-            "packageListRef",
+            "buildCommand",
+            "verifyCommand",
             "artifactName",
             "artifactFile",
             "retentionDays",
@@ -438,12 +438,11 @@ def load_policy(root: Path) -> Dict[str, Any]:
         )
     listing_configuration = protected["listing"]
     if (
-        not re.fullmatch(r"[0-9a-f]{40}", listing_configuration["packageListRef"])
-        or not isinstance(listing_configuration["retentionDays"], int)
+        not isinstance(listing_configuration["retentionDays"], int)
         or listing_configuration["retentionDays"] <= 0
     ):
         raise ValidatorConfigurationError(
-            "Protected listing workflow dependency configuration is invalid."
+            "Protected listing workflow artifact configuration is invalid."
         )
     if not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", policy["releaseDate"]):
         raise ValidatorConfigurationError(
@@ -2843,11 +2842,7 @@ def check_listing_workflow(
     if text is None:
         return findings
     findings.extend(check_workflow_common(path, text, configuration, manual_only=True))
-    expected_uses = [
-        configuration["checkout"],
-        configuration["checkout"],
-        configuration["uploadArtifact"],
-    ]
+    expected_uses = [configuration["checkout"], configuration["uploadArtifact"]]
     if workflow_uses(text) != expected_uses:
         findings.append(
             finding(
@@ -2858,36 +2853,9 @@ def check_listing_workflow(
             )
         )
     checkout_blocks = step_for_action(text, configuration["checkout"])
-    if len(checkout_blocks) != 2:
+    if len(checkout_blocks) != 1:
         findings.append(
-            finding("WORKFLOWS", path, "Listing workflow must contain two pinned checkouts.")
-        )
-    else:
-        dependency_checkout = checkout_blocks[1]
-        if step_with_keys(dependency_checkout) != [
-            "repository",
-            "ref",
-            "path",
-            "persist-credentials",
-        ]:
-            findings.append(
-                finding(
-                    "WORKFLOWS",
-                    path,
-                    "Listing dependency checkout settings are not exact.",
-                    "repository, ref, path, and disabled credentials",
-                )
-            )
-        append_missing_patterns(
-            findings,
-            path,
-            dependency_checkout,
-            (
-                (r"^\s{{10}}repository:\s*{0}\s*$".format(re.escape(configuration["packageListRepository"])), "package-list repository"),
-                (r"^\s{{10}}ref:\s*{0}\s*$".format(configuration["packageListRef"]), "pinned package-list commit"),
-                (r"^\s{10}path:\s*\.package-list-action\s*$", "isolated package-list checkout"),
-                (r"^\s{10}persist-credentials:\s*false\s*$", "disabled dependency checkout credentials"),
-            ),
+            finding("WORKFLOWS", path, "Listing workflow must contain one pinned checkout.")
         )
     append_missing_patterns(
         findings,
@@ -2896,26 +2864,122 @@ def check_listing_workflow(
         (
             (re.escape("python3 ci/validate_repository.py --root ."), "repository validator"),
             (re.escape('python3 -B -m unittest discover -s ci/tests -p "test_*.py"'), "release pipeline tests"),
-            (r"bash \.package-list-action/build\.sh BuildRepoListing", "pinned listing builder"),
-            (r"--current-package-name com\.teyocesu\.avatar-doctor", "exact package identity"),
-            (r"python3 ci/release_pipeline\.py normalize-listing", "local listing normalization"),
-            (r"python3 ci/release_pipeline\.py verify-listing", "local listing verification"),
-            (r"^\s*--root \. \\$", "repository source for ZIP verification"),
-            (r"--source-ref \"refs/tags/v\$EXPECTED_VERSION\"", "version tag source for ZIP verification"),
-            (r"^\s*--remote\s*$", "remote release ZIP verification"),
+            (re.escape(configuration["buildCommand"]), "self-contained listing builder"),
+            (re.escape(configuration["verifyCommand"]), "independent listing verifier"),
             (r"\$RUNNER_TEMP/avatar-doctor-listing", "temporary listing root"),
-            (r"trap 'rm -rf -- \.package-list-action' EXIT", "temporary dependency cleanup"),
+            (r"\$GITHUB_STEP_SUMMARY", "listing verification summary"),
+            (
+                r'if \[ "\$EXPECTED_VERSION" != "{0}" \]; then'.format(
+                    re.escape(configuration["expectedVersion"])
+                ),
+                "exact requested-version gate",
+            ),
         ),
     )
-    if len(re.findall(r"\bsecrets\.GITHUB_TOKEN\b", text)) != 1 or re.search(
-        r"\bsecrets\.(?!GITHUB_TOKEN\b)", text
+
+    build_blocks = [
+        block
+        for block in workflow_step_blocks(text)
+        if re.search(
+            r"^\s*{0}\s+\\$".format(re.escape(configuration["buildCommand"])),
+            block,
+            re.MULTILINE,
+        )
+    ]
+    expected_build_lines = [
+        configuration["buildCommand"] + " \\",
+        "--root . \\",
+        '--output "$RUNNER_TEMP/avatar-doctor-listing/local/index.json" \\',
+        '--expected-version "$EXPECTED_VERSION" \\',
+        '--source-ref "refs/tags/v$EXPECTED_VERSION" \\',
+        "--remote",
+    ]
+    if (
+        len(build_blocks) != 1
+        or multiline_step_values(build_blocks[0], "run") != expected_build_lines
     ):
         findings.append(
             finding(
                 "WORKFLOWS",
                 path,
-                "Listing workflow secret references are not limited to the built-in token.",
-                "secrets.GITHUB_TOKEN once",
+                "Listing builder command is not the approved exact command.",
+                "Python builder with explicit version tag and remote ZIP",
+            )
+        )
+
+    verify_blocks = [
+        block
+        for block in workflow_step_blocks(text)
+        if re.search(
+            r"^\s*{0}\s+\\$".format(re.escape(configuration["verifyCommand"])),
+            block,
+            re.MULTILINE,
+        )
+    ]
+    expected_verify_lines = [
+        configuration["verifyCommand"] + " \\",
+        '--listing "$RUNNER_TEMP/avatar-doctor-listing/local/index.json" \\',
+        '--expected-version "$EXPECTED_VERSION" \\',
+        "--root . \\",
+        '--source-ref "refs/tags/v$EXPECTED_VERSION" \\',
+        "--remote",
+        "{",
+        'echo "## Verified local VPM listing"',
+        "echo",
+        'echo "- Commit: $GITHUB_SHA"',
+        'echo "- Version: $EXPECTED_VERSION"',
+        'echo "- Remote ZIP verification: passed"',
+        '} >> "$GITHUB_STEP_SUMMARY"',
+    ]
+    verify_lines = (
+        multiline_step_values(verify_blocks[0], "run") if len(verify_blocks) == 1 else []
+    )
+    if len(verify_blocks) != 1 or verify_lines != expected_verify_lines:
+        findings.append(
+            finding(
+                "WORKFLOWS",
+                path,
+                "Listing verifier command is not the approved exact command.",
+                "Independent verifier with explicit version tag and remote ZIP",
+            )
+        )
+
+    command_counts = (
+        (
+            r"^\s*{0}\b".format(re.escape(configuration["buildCommand"])),
+            1,
+            "one self-contained listing build",
+        ),
+        (
+            r"^\s*{0}\b".format(re.escape(configuration["verifyCommand"])),
+            1,
+            "one independent listing verification",
+        ),
+        (
+            r'^\s*--source-ref\s+"refs/tags/v\$EXPECTED_VERSION"',
+            2,
+            "explicit version tag for builder and verifier",
+        ),
+        (r"^\s*--remote\s*$", 2, "remote ZIP verification in builder and verifier"),
+    )
+    for pattern, expected_count, description in command_counts:
+        if len(re.findall(pattern, text, re.MULTILINE)) != expected_count:
+            findings.append(
+                finding(
+                    "WORKFLOWS",
+                    path,
+                    "Listing workflow command count is invalid.",
+                    description,
+                )
+            )
+
+    if re.search(r"\bsecrets\s*\.", text):
+        findings.append(
+            finding(
+                "WORKFLOWS",
+                path,
+                "Listing workflow must not reference secrets.",
+                "No secret references",
             )
         )
     upload_blocks = step_for_action(text, configuration["uploadArtifact"])
@@ -2951,6 +3015,9 @@ def check_listing_workflow(
         (
             (r"(?:^|[/\s])Website(?:/|\s|$)", "tracked Website output"),
             (r"upload-pages-artifact|deploy-pages|configure-pages", "Pages deployment action"),
+            (r"vrchat-community/package-list-action|\.package-list-action", "external listing runtime builder"),
+            (r"\b(?:setup-)?dotnet\b", ".NET listing runtime"),
+            (r"\bnormalize-listing\b", "external-listing normalization path"),
         ),
     )
     return findings

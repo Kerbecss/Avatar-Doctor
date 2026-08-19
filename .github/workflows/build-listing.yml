@@ -38,34 +38,22 @@ jobs:
             echo "expected_version must be 0.0.6." >&2
             exit 1
           fi
-      - name: Checkout pinned listing builder
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          repository: vrchat-community/package-list-action
-          ref: cb31c3b5d17d1070d7741c61de2ca1b219224039
-          path: .package-list-action
-          persist-credentials: false
-      - name: Build and verify local listing
+      - name: Build local verification listing with Python
         env:
           EXPECTED_VERSION: ${{ inputs.expected_version }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          set -euo pipefail
-          trap 'rm -rf -- .package-list-action' EXIT
-          listing_root="$RUNNER_TEMP/avatar-doctor-listing"
-          raw_listing="$listing_root/raw"
-          local_listing="$listing_root/local/index.json"
-          bash .package-list-action/build.sh BuildRepoListing \
-            --root .package-list-action \
-            --list-publish-directory "$raw_listing" \
-            --current-package-name com.teyocesu.avatar-doctor \
-            --package-listing-suffix Verification
-          python3 ci/release_pipeline.py normalize-listing \
-            --input "$raw_listing/index.json" \
-            --output "$local_listing" \
-            --expected-version "$EXPECTED_VERSION"
+          python3 ci/release_pipeline.py build-listing \
+            --root . \
+            --output "$RUNNER_TEMP/avatar-doctor-listing/local/index.json" \
+            --expected-version "$EXPECTED_VERSION" \
+            --source-ref "refs/tags/v$EXPECTED_VERSION" \
+            --remote
+      - name: Verify listing independently against tag and remote ZIP
+        env:
+          EXPECTED_VERSION: ${{ inputs.expected_version }}
+        run: |
           python3 ci/release_pipeline.py verify-listing \
-            --listing "$local_listing" \
+            --listing "$RUNNER_TEMP/avatar-doctor-listing/local/index.json" \
             --expected-version "$EXPECTED_VERSION" \
             --root . \
             --source-ref "refs/tags/v$EXPECTED_VERSION" \
