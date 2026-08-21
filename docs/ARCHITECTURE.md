@@ -2,15 +2,16 @@
 
 ## Current implementation
 
-Version `0.0.5` contains an Editor-only Unity package with:
+Version `0.0.6` contains an Editor-only Unity package with:
 
 - assembly `Teyocesu.AvatarDoctor.Editor`;
 - internal package identity and version constants;
 - one code-only UI Toolkit Editor window;
-- menu entry `Tools → Avatar Doctor`; and
-- deterministic repository validation.
+- menu entry `Tools → Avatar Doctor`;
+- deterministic repository validation; and
+- a validated deterministic release pipeline.
 
-The window is a presentation-only shell. It does not inspect scenes, access assets, discover avatars, run diagnostics, apply repairs, use SDK APIs, build, or publish.
+The window is a presentation-only shell. It does not inspect scenes, access assets, discover avatars, scan, run diagnostics, apply repairs, use SDK APIs, build, or publish. The package does not declare a VRChat Avatars SDK dependency.
 
 ## Package boundary
 
@@ -101,7 +102,7 @@ Will contain Editor tests, rule fixtures, repair scenarios, regression cases, an
 
 ### Distribution
 
-The package is not currently available from a public VCC listing. `v0.0.6 — Release Pipeline` will validate package archives, clean installation, listing generation, and recovery procedures before distribution is enabled.
+The package is not currently available from a public VCC listing. `v0.0.6 — Release Pipeline` validated reproducible package archives, non-public listing verification, recovery procedures, and a clean installation. Public VPM distribution and GitHub Pages remain disabled.
 
 ## Diagnostic model
 
