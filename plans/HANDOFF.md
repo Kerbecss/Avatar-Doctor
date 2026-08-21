@@ -6,11 +6,22 @@
 
 ## Canonical spec
 
-[docs/specs/v0.1.0-avatar-discovery.md](../docs/specs/v0.1.0-avatar-discovery.md)
+[docs/specs/v0.1.0-avatar-discovery.md](../docs/specs/v0.1.0-avatar-discovery.md) — approved
 
 ## Plan
 
 [plans/v0.1.0.md](v0.1.0.md)
+
+## Milestone
+
+[#7 — v0.1.0 — Avatar Discovery](https://github.com/Teyocesu/Avatar-Doctor/milestone/7)
+
+## Issues
+
+- [#30 — Integrate the VRChat Avatars SDK boundary](https://github.com/Teyocesu/Avatar-Doctor/issues/30)
+- [#31 — Discover and select avatars in loaded scenes](https://github.com/Teyocesu/Avatar-Doctor/issues/31)
+- [#32 — Present zero, one, and multiple avatar states](https://github.com/Teyocesu/Avatar-Doctor/issues/32)
+- [#33 — Validate Avatar Discovery and release v0.1.0](https://github.com/Teyocesu/Avatar-Doctor/issues/33)
 
 ## Branch
 
@@ -22,19 +33,19 @@
 
 ## Current status
 
-Planning artifacts drafted; awaiting external review.
+Planning approved and GitHub work items created.
 
 ## Last completed work
 
-Phase 0 planning and workflow bootstrap drafted with local validation coverage.
+Phase 0 — Planning and workflow bootstrap.
 
 ## Next gate
 
-External approval of the SPEC and PLAN before creating the milestone or Issues or starting Phase 1.
+Explicit authorization to start Phase 1 — VRChat SDK integration boundary.
 
 ## Known blockers
 
-None beyond the required external approval gate.
+None.
 
 ## Implementation started
 
