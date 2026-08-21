@@ -19,14 +19,23 @@ No third-party Python packages are required for repository validation.
 
 1. Fork the repository, or create a branch directly when you have write access.
 2. Clone the repository and enter its root directory.
-3. Run the repository validator before making changes:
+3. Read the permanent repository rules in [AGENTS.md](AGENTS.md).
+4. Before implementing an active release, read its canonical artifacts:
+
+   ```text
+   AGENTS.md
+   docs/specs/<active-release>.md
+   plans/<active-release>.md
+   ```
+
+5. Run the repository validator before making changes:
 
    ```shell
    python ci/validate_repository.py --root .
    ```
 
-4. Open the project through VCC when changing Unity package code or assets.
-5. Keep changes limited to one clear goal and run the relevant validation again before opening a Pull Request.
+6. Open the project through VCC when changing Unity package code or assets.
+7. Keep changes limited to one clear goal and run the relevant validation again before opening a Pull Request.
 
 ## Branches
 

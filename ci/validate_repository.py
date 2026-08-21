@@ -210,6 +210,7 @@ def load_policy(root: Path) -> Dict[str, Any]:
         "expectedPackageUrl",
         "expectedIdentity",
         "requiredRootFiles",
+        "planningContract",
         "requiredPackageFiles",
         "allowedAssemblyDefinitions",
         "allowedNamespaces",
@@ -503,6 +504,44 @@ def load_policy(root: Path) -> Dict[str, Any]:
     if len(expected_versions) != len(set(expected_versions)):
         raise ValidatorConfigurationError(
             "Validation policy roadmap release versions must be unique."
+        )
+
+    planning_contract = policy["planningContract"]
+    planning_keys = {"release", "agents", "spec", "plan", "handoff"}
+    if not isinstance(planning_contract, dict) or set(planning_contract) != planning_keys:
+        raise ValidatorConfigurationError(
+            "Validation policy planningContract is incomplete."
+        )
+    if not re.fullmatch(
+        r"v[0-9]+\.[0-9]+\.[0-9]+", str(planning_contract.get("release", ""))
+    ):
+        raise ValidatorConfigurationError(
+            "Validation policy planningContract.release is invalid."
+        )
+    for key in sorted(planning_keys - {"release"}):
+        path = planning_contract.get(key)
+        pure_path = PurePosixPath(str(path))
+        if (
+            not isinstance(path, str)
+            or not path
+            or pure_path.is_absolute()
+            or ".." in pure_path.parts
+        ):
+            raise ValidatorConfigurationError(
+                "Validation policy planningContract contains an invalid path."
+            )
+    release = planning_contract["release"]
+    if (
+        planning_contract["agents"] != "AGENTS.md"
+        or planning_contract["handoff"] != "plans/HANDOFF.md"
+        or planning_contract["plan"] != "plans/{0}.md".format(release)
+        or not re.fullmatch(
+            r"docs/specs/{0}-[a-z0-9-]+\.md".format(re.escape(release)),
+            planning_contract["spec"],
+        )
+    ):
+        raise ValidatorConfigurationError(
+            "Validation policy planningContract paths do not match the active release."
         )
 
     public_content = policy["publicContent"]
@@ -1045,6 +1084,98 @@ def check_identity(context: RepositoryContext) -> List[Finding]:
     return findings
 
 
+def validate_planning_contract(
+    context: RepositoryContext, check_id: str = "STRUCTURE"
+) -> List[Finding]:
+    contract = context.policy["planningContract"]
+    required_paths = {
+        key: str(contract[key]) for key in ("agents", "spec", "plan", "handoff")
+    }
+    findings: List[Finding] = []
+
+    for label, relative_path in sorted(required_paths.items()):
+        if not context.is_tracked(relative_path):
+            findings.append(
+                finding(
+                    check_id,
+                    relative_path,
+                    "Required planning {0} is not tracked.".format(label),
+                    "Tracked file",
+                )
+            )
+        elif not context.absolute(relative_path).is_file() or context.absolute(
+            relative_path
+        ).is_symlink():
+            findings.append(
+                finding(
+                    check_id,
+                    relative_path,
+                    "Required planning path is not a regular file.",
+                    "Regular file",
+                )
+            )
+
+    release = re.escape(str(contract["release"]))
+    spec_pattern = re.compile(r"docs/specs/{0}-[a-z0-9-]+\.md".format(release))
+    plan_pattern = re.compile(r"plans/{0}(?:-[a-z0-9-]+)?\.md".format(release))
+    expected_spec = required_paths["spec"]
+    expected_plan = required_paths["plan"]
+
+    for relative_path in context.tracked_files:
+        if spec_pattern.fullmatch(relative_path) and relative_path != expected_spec:
+            findings.append(
+                finding(
+                    check_id,
+                    relative_path,
+                    "Active-release SPEC path drifts from the canonical policy path.",
+                    expected_spec,
+                )
+            )
+        if plan_pattern.fullmatch(relative_path) and relative_path != expected_plan:
+            findings.append(
+                finding(
+                    check_id,
+                    relative_path,
+                    "Active-release PLAN path drifts from the canonical policy path.",
+                    expected_plan,
+                )
+            )
+
+    reference_expectations = {
+        expected_plan: (expected_spec,),
+        required_paths["handoff"]: (expected_spec, expected_plan),
+    }
+    for relative_path, expected_references in reference_expectations.items():
+        if not context.is_tracked(relative_path) or not context.absolute(
+            relative_path
+        ).is_file():
+            continue
+        try:
+            text = context.read_text(relative_path)
+        except UnicodeDecodeError:
+            findings.append(
+                finding(
+                    check_id,
+                    relative_path,
+                    "Planning file is not valid UTF-8.",
+                    "UTF-8",
+                )
+            )
+            continue
+        for expected_reference in expected_references:
+            if expected_reference not in text:
+                findings.append(
+                    finding(
+                        check_id,
+                        relative_path,
+                        "Canonical planning reference is missing.",
+                        expected_reference,
+                    )
+                )
+
+    return findings
+
+
 def check_structure(context: RepositoryContext) -> List[Finding]:
     check_id = "STRUCTURE"
     policy = context.policy
@@ -1198,6 +1329,7 @@ def check_structure(context: RepositoryContext) -> List[Finding]:
                 "No test assembly",
             )
         )
+    findings.extend(validate_planning_contract(context, check_id))
     return findings
 
 

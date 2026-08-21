@@ -26,6 +26,7 @@
     "README.md",
     "ci/release_pipeline.py",
     "ci/tests/test_release_pipeline.py",
+    "ci/tests/test_validate_repository.py",
     "ci/validate_repository.py",
     "ci/validation-policy.json",
     "docs/ARCHITECTURE.md",
@@ -35,6 +36,13 @@
     "docs/VALIDATION.md",
     "docs/WORKFLOW.md"
   ],
+  "planningContract": {
+    "release": "v0.1.0",
+    "agents": "AGENTS.md",
+    "spec": "docs/specs/v0.1.0-avatar-discovery.md",
+    "plan": "plans/v0.1.0.md",
+    "handoff": "plans/HANDOFF.md"
+  },
   "requiredPackageFiles": [
     "CHANGELOG.md",
     "Editor/Core/AvatarDoctorPackageInfo.cs",

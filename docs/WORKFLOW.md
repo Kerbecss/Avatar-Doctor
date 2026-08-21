@@ -23,6 +23,12 @@ Issues describe goals and acceptance criteria. Milestones group related work for
 
 Labels identify the change type, affected area, and risk when those classifications are useful.
 
+## Spec-driven release development
+
+Meaningful releases begin with one canonical SPEC that defines behavior, scope, architecture, invariants, and acceptance criteria. A release PLAN references that SPEC and divides the approved work into gated phases without redefining it. HANDOFF contains only the current execution state and next gate.
+
+Implementation proceeds one approved phase at a time. Issues are derived only after specification approval, and a Draft Pull Request may remain open across the release. CI supports independent review but does not replace it. The next phase begins only after the previous phase exit gate is complete.
+
 ## Commits
 
 Commit messages use Conventional Commits in English:
@@ -87,7 +93,7 @@ See [Release verification and recovery](RELEASES.md) for artifact verification, 
 
 ## Release checklist
 
-- The change matches its Issues and milestone.
+- The change matches its approved SPEC, PLAN, Issues, and milestone as applicable.
 - Repository validation passes for the Pull Request head.
 - Required Unity validation is recorded.
 - Documentation and changelog entries are current.
