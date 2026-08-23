@@ -677,23 +677,89 @@ def load_policy(root: Path) -> Dict[str, Any]:
                     )
                 ) from error
 
+    package_root = policy["packageRoot"]
+    expected_assembly_definitions = [
+        {
+            "kind": "production",
+            "path": package_root
+            + "/Editor/Teyocesu.AvatarDoctor.Editor.asmdef",
+            "name": "Teyocesu.AvatarDoctor.Editor",
+            "rootNamespace": "Teyocesu.AvatarDoctor.Editor",
+            "includePlatforms": ["Editor"],
+            "references": ["VRC.SDK3A"],
+            "precompiledReferences": [],
+            "autoReferenced": True,
+            "defineConstraints": [],
+            "optionalUnityReferences": [],
+        },
+        {
+            "kind": "editorTest",
+            "path": package_root
+            + "/Tests/Editor/Teyocesu.AvatarDoctor.Editor.Tests.asmdef",
+            "name": "Teyocesu.AvatarDoctor.Editor.Tests",
+            "rootNamespace": "Teyocesu.AvatarDoctor.Editor.Tests",
+            "includePlatforms": ["Editor"],
+            "references": ["Teyocesu.AvatarDoctor.Editor", "VRC.SDK3A"],
+            "precompiledReferences": ["VRCSDK3A.dll", "VRCSDKBase.dll"],
+            "autoReferenced": False,
+            "defineConstraints": ["UNITY_INCLUDE_TESTS"],
+            "optionalUnityReferences": ["TestAssemblies"],
+        },
+    ]
+    if policy["allowedAssemblyDefinitions"] != expected_assembly_definitions:
+        raise ValidatorConfigurationError(
+            "allowedAssemblyDefinitions must declare the exact production and Phase 2 Editor test assemblies."
+        )
+
     source_profiles = policy["sourceProfiles"]
     expected_source_profiles = {
-        policy["packageRoot"] + "/Editor/Core/AvatarDoctorPackageInfo.cs": "constantsOnly",
-        policy["packageRoot"] + "/Editor/UI/AvatarDoctorWindow.cs": "editorWindowShell",
-        sdk_boundary["sourcePath"]: "vrchatSdkBoundary",
+        package_root + "/Editor/AssemblyInfo.cs": "friendAssembly",
+        package_root + "/Editor/Core/AvatarDoctorPackageInfo.cs": "constantsOnly",
+        package_root
+        + "/Editor/Discovery/AvatarDiscoveryCandidate.cs": "discoveryCandidate",
+        package_root
+        + "/Editor/Discovery/AvatarDiscoveryCandidateComparer.cs": "discoveryOrdering",
+        package_root
+        + "/Editor/Discovery/AvatarDiscoveryResult.cs": "discoveryResult",
+        package_root
+        + "/Editor/Discovery/AvatarDiscoveryService.cs": "discoveryService",
+        package_root
+        + "/Editor/Discovery/AvatarDiscoveryState.cs": "discoveryState",
+        package_root + "/Editor/UI/AvatarDoctorWindow.cs": "editorWindowShell",
+        sdk_boundary["sourcePath"]: "vrchatDiscoveryBoundary",
+        package_root
+        + "/Tests/Editor/AvatarDiscoveryOrderingTests.cs": "phase2EditorTests",
+        package_root
+        + "/Tests/Editor/AvatarDiscoveryResultTests.cs": "phase2EditorTests",
+        package_root
+        + "/Tests/Editor/AvatarDiscoveryServiceTests.cs": "phase2FixtureEditorTests",
     }
     if not isinstance(source_profiles, dict) or set(source_profiles) != set(
         expected_source_profiles
     ):
         raise ValidatorConfigurationError(
-            "sourceProfiles must define exactly the two package source files allowed by policy."
+            "sourceProfiles must declaratively define the exact active package C# sources."
         )
     prohibited_pattern_names = {
         entry["name"] for entry in policy["prohibitedCodePatterns"]
     }
     expected_profile_exceptions = {
+        "friendAssembly": {"Method or invocation syntax"},
         "constantsOnly": set(),
+        "discoveryCandidate": {
+            "Unity runtime API",
+            "Runtime object API",
+            "Method or invocation syntax",
+        },
+        "discoveryOrdering": {"Method or invocation syntax"},
+        "discoveryResult": {"Method or invocation syntax"},
+        "discoveryService": {
+            "Unity Editor API",
+            "Unity runtime API",
+            "Scene API",
+            "Method or invocation syntax",
+        },
+        "discoveryState": set(),
         "editorWindowShell": {
             "Unity Editor API",
             "Unity runtime API",
@@ -701,7 +767,31 @@ def load_policy(root: Path) -> Dict[str, Any]:
             "Menu item",
             "Method or invocation syntax",
         },
-        "vrchatSdkBoundary": {
+        "vrchatDiscoveryBoundary": {
+            "Unity runtime API",
+            "Scene API",
+            "Runtime object API",
+            "VRChat SDK type",
+            "Method or invocation syntax",
+        },
+        "phase2EditorTests": {
+            "Unity Editor API",
+            "Unity runtime API",
+            "Asset access",
+            "Editor mutation",
+            "Scene API",
+            "Runtime object API",
+            "VRChat SDK type",
+            "Method or invocation syntax",
+        },
+        "phase2FixtureEditorTests": {
+            "Unity Editor API",
+            "Unity runtime API",
+            "Asset access",
+            "Editor mutation",
+            "Scene API",
+            "Runtime object API",
+            "File I/O",
             "VRChat SDK type",
             "Method or invocation syntax",
         },
@@ -1376,7 +1466,6 @@ def check_structure(context: RepositoryContext) -> List[Finding]:
         "Rules",
         "Runtime",
         "Scanning",
-        "Tests",
     }
     package_prefix = package_root + "/"
     sdk_source_path = policy["sdkBoundary"]["sourcePath"]
@@ -1399,8 +1488,8 @@ def check_structure(context: RepositoryContext) -> List[Finding]:
                 finding(
                     check_id,
                     relative_path,
-                    "Integration path is outside the exact Phase 1 SDK boundary.",
-                    "Only the approved VRChat boundary source and Unity metadata",
+                    "Integration path is outside the exact Phase 2 SDK boundary.",
+                    "Only the approved VRChat discovery boundary and Unity metadata",
                 )
             )
         package_parts = PurePosixPath(relative_path[len(package_prefix) :]).parts
@@ -1420,6 +1509,29 @@ def check_structure(context: RepositoryContext) -> List[Finding]:
                     check_id,
                     relative_path,
                     "Empty-folder placeholder is not allowed in the Unity package.",
+                )
+            )
+
+    phase2_scoped_prefixes = (
+        package_root + "/Editor/Discovery/",
+        package_root + "/Tests/",
+    )
+    allowed_phase2_scoped_paths = {
+        package_root + "/" + relative_path
+        for relative_path in policy["requiredPackageFiles"]
+        if relative_path.startswith("Editor/Discovery/")
+        or relative_path.startswith("Tests/")
+    }
+    for relative_path in context.tracked_files:
+        if relative_path.startswith(
+            phase2_scoped_prefixes
+        ) and relative_path not in allowed_phase2_scoped_paths:
+            findings.append(
+                finding(
+                    check_id,
+                    relative_path,
+                    "Phase 2 package path is not in the declarative allowlist.",
+                    "Only approved discovery and Editor test artifacts",
                 )
             )
 
@@ -1500,15 +1612,6 @@ def check_structure(context: RepositoryContext) -> List[Finding]:
                 "No Runtime assembly",
             )
         )
-    if any("/Tests/" in "/" + path for path in own_asmdefs):
-        findings.append(
-            finding(
-                check_id,
-                package_root,
-                "A Unity test assembly is present.",
-                "No test assembly",
-            )
-        )
     findings.extend(validate_planning_contract(context, check_id))
     return findings
 
@@ -1517,24 +1620,49 @@ def validate_sdk_assembly_references(
     context: RepositoryContext, assembly_path: str, assembly: Dict[str, Any]
 ) -> List[Finding]:
     check_id = "ASSEMBLY"
-    expected_reference = context.policy["sdkBoundary"]["assemblyReference"]
     findings: List[Finding] = []
-    if assembly.get("references") != [expected_reference]:
+    configuration = next(
+        (
+            entry
+            for entry in context.policy["allowedAssemblyDefinitions"]
+            if entry["path"] == assembly_path
+        ),
+        None,
+    )
+    if configuration is None:
+        return [
+            finding(
+                check_id,
+                assembly_path,
+                "Assembly definition is outside the declarative allowlist.",
+            )
+        ]
+
+    expected_references = configuration["references"]
+    if assembly.get("references") != expected_references:
+        boundary_label = (
+            "production SDK boundary"
+            if configuration["kind"] == "production"
+            else "Phase 2 Editor test boundary"
+        )
         findings.append(
             finding(
                 check_id,
                 assembly_path,
-                "Explicit assembly references are outside the approved SDK boundary.",
-                expected_reference + " only",
+                "Explicit assembly references are outside the approved {0}.".format(
+                    boundary_label
+                ),
+                ", ".join(expected_references),
             )
         )
-    if assembly.get("precompiledReferences") != []:
+    expected_precompiled_references = configuration["precompiledReferences"]
+    if assembly.get("precompiledReferences") != expected_precompiled_references:
         findings.append(
             finding(
                 check_id,
                 assembly_path,
-                "Precompiled assembly references are outside the approved SDK boundary.",
-                "No precompiled references",
+                "Precompiled assembly references are outside the approved assembly boundary.",
+                repr(expected_precompiled_references),
             )
         )
     return findings
@@ -1567,13 +1695,13 @@ def check_assembly(context: RepositoryContext) -> List[Finding]:
         if path.startswith(package_prefix) and path.endswith(".asmdef")
     )
     findings: List[Finding] = []
-    if len(own_asmdefs) != 1:
+    if len(own_asmdefs) != len(allowed):
         findings.append(
             finding(
                 check_id,
                 policy["packageRoot"],
                 "Found {0} package assembly definitions.".format(len(own_asmdefs)),
-                "Exactly 1",
+                "Exactly {0}".format(len(allowed)),
             )
         )
     for unexpected_path in sorted(set(own_asmdefs) - allowed_paths):
@@ -1593,8 +1721,13 @@ def check_assembly(context: RepositoryContext) -> List[Finding]:
             "name": expected["name"],
             "rootNamespace": expected["rootNamespace"],
             "includePlatforms": expected["includePlatforms"],
+            "excludePlatforms": [],
             "allowUnsafeCode": False,
             "overrideReferences": False,
+            "autoReferenced": expected["autoReferenced"],
+            "defineConstraints": expected["defineConstraints"],
+            "versionDefines": [],
+            "noEngineReferences": False,
         }
         for key, expected_value in expectations.items():
             if assembly.get(key) != expected_value:
@@ -1606,6 +1739,16 @@ def check_assembly(context: RepositoryContext) -> List[Finding]:
                         repr(expected_value),
                     )
                 )
+        actual_optional_references = assembly.get("optionalUnityReferences", [])
+        if actual_optional_references != expected["optionalUnityReferences"]:
+            findings.append(
+                finding(
+                    check_id,
+                    assembly_path,
+                    "Optional Unity references are outside the approved assembly boundary.",
+                    repr(expected["optionalUnityReferences"]),
+                )
+            )
         findings.extend(
             validate_sdk_assembly_references(context, assembly_path, assembly)
         )
@@ -1868,10 +2011,16 @@ def expected_vrchat_sdk_boundary_lines(
         "{",
         "internal static class VRChatAvatarDescriptorBoundary",
         "{",
-        "internal static {0} Preserve(".format(configuration["sdkType"]),
-        "{0} descriptor)".format(configuration["sdkType"]),
+        "internal static void AppendCandidates({0} descriptor)".format(
+            configuration["sdkType"]
+        ),
         "{",
-        "return descriptor;",
+        "}",
+        "internal static bool IsCandidateLive({0} descriptor)".format(
+            configuration["sdkType"]
+        ),
+        "{",
+        "return descriptor != null;",
         "}",
         "}",
         "}",
@@ -1883,17 +2032,100 @@ def check_vrchat_sdk_boundary_source_profile(
 ) -> List[Finding]:
     check_id = "SOURCE"
     configuration = context.policy["sdkBoundary"]
+    findings: List[Finding] = []
+    required_fragments = (
+        "using {0};".format(configuration["sdkNamespace"]),
+        "namespace {0}".format(configuration["namespace"]),
+        "internal static class VRChatAvatarDescriptorBoundary",
+        "AppendCandidates(",
+        "IsCandidateLive(",
+        configuration["sdkType"],
+    )
+    for fragment in required_fragments:
+        if fragment not in source:
+            findings.append(
+                finding(
+                    check_id,
+                    source_path,
+                    "VRChat discovery boundary is missing a required fragment.",
+                    fragment,
+                )
+            )
+    if re.search(r"\bPreserve\s*\(", source):
+        findings.append(
+            finding(
+                check_id,
+                source_path,
+                "Obsolete Phase 1 identity proof remains in the discovery boundary.",
+                "Real Phase 2 discovery integration only",
+            )
+        )
+    return findings
+
+
+def check_friend_assembly_source_profile(
+    source_path: str, source: str
+) -> List[Finding]:
+    expected_lines = (
+        "using System.Runtime.CompilerServices;",
+        '[assembly: InternalsVisibleTo("Teyocesu.AvatarDoctor.Editor.Tests")]',
+    )
     actual_lines = tuple(line.strip() for line in source.splitlines() if line.strip())
-    if actual_lines == expected_vrchat_sdk_boundary_lines(configuration):
+    if actual_lines == expected_lines:
         return []
     return [
         finding(
-            check_id,
+            "SOURCE",
             source_path,
-            "VRChat SDK source differs from the exact compile-time boundary profile.",
-            "One internal identity boundary directly typed as VRCAvatarDescriptor",
+            "Friend-assembly declaration is outside the exact Phase 2 boundary.",
+            "InternalsVisibleTo for Teyocesu.AvatarDoctor.Editor.Tests only",
         )
     ]
+
+
+def check_phase2_discovery_read_only_source(
+    source_path: str, source: str
+) -> List[Finding]:
+    mutation_patterns = (
+        (
+            r"\b(?:AssetDatabase|SerializedObject|SerializedProperty|Undo|PrefabUtility|"
+            r"EditorPrefs|SessionState)\b",
+            "asset, serialization, Undo, prefab, or persistent Editor mutation API",
+        ),
+        (
+            r"\bEditorSceneManager\s*\.\s*(?:MarkSceneDirty|MarkSceneClean|"
+            r"SaveScene|SaveScenes|SaveOpenScenes|NewScene|CloseScene)\s*\(",
+            "scene mutation API",
+        ),
+        (
+            r"\bSceneManager\s*\.\s*MoveGameObjectToScene\s*\(",
+            "scene object move API",
+        ),
+        (
+            r"(?:\bnew\s+GameObject\s*\(|\.\s*AddComponent\s*<|"
+            r"\bObject\s*\.\s*Destroy(?:Immediate)?\s*\(|"
+            r"\.\s*SetActive\s*\(|\.\s*SetParent\s*\()",
+            "GameObject or Component mutation API",
+        ),
+        (
+            r"\b(?:CreateAsset|ImportAsset|SaveAssets|Refresh)\s*\(",
+            "project asset mutation API",
+        ),
+    )
+    findings: List[Finding] = []
+    for pattern, label in mutation_patterns:
+        match = re.search(pattern, source)
+        if match:
+            line = source.count("\n", 0, match.start()) + 1
+            findings.append(
+                finding(
+                    "SOURCE",
+                    source_path,
+                    "Detectable {0} found at line {1}.".format(label, line),
+                    "Read-only Phase 2 discovery production source",
+                )
+            )
+    return findings
 
 
 def check_source(context: RepositoryContext) -> List[Finding]:
@@ -1938,23 +2170,41 @@ def check_source(context: RepositoryContext) -> List[Finding]:
         profile_configuration = source_profiles.get(source_path)
         if profile_configuration is not None:
             profile_name = profile_configuration["profile"]
-            if profile_name == "constantsOnly":
+            if profile_name == "friendAssembly":
+                findings.extend(
+                    check_friend_assembly_source_profile(source_path, source)
+                )
+            elif profile_name == "constantsOnly":
                 findings.extend(
                     check_constants_only_source(context, source_path, source)
                 )
             elif profile_name == "editorWindowShell":
                 findings.extend(check_editor_window_source_profile(source_path, source))
-            elif profile_name == "vrchatSdkBoundary":
+            elif profile_name == "vrchatDiscoveryBoundary":
                 findings.extend(
                     check_vrchat_sdk_boundary_source_profile(
                         context, source_path, source
                     )
                 )
+            if profile_name in {
+                "discoveryCandidate",
+                "discoveryOrdering",
+                "discoveryResult",
+                "discoveryService",
+                "discoveryState",
+                "vrchatDiscoveryBoundary",
+            }:
+                findings.extend(
+                    check_phase2_discovery_read_only_source(source_path, source)
+                )
 
         namespaces = re.findall(
             r"\bnamespace\s+([A-Za-z_][A-Za-z0-9_.]*)", source
         )
-        if not namespaces:
+        if not namespaces and (
+            profile_configuration is None
+            or profile_configuration["profile"] != "friendAssembly"
+        ):
             findings.append(
                 finding(check_id, source_path, "C# source has no namespace declaration.")
             )
@@ -2454,7 +2704,10 @@ def metadata_value(text: str, key: str) -> Optional[str]:
 def check_unity_metadata(context: RepositoryContext) -> List[Finding]:
     check_id = "UNITY_METADATA"
     package_root = context.policy["packageRoot"]
-    editor_prefix = package_root + "/Editor"
+    code_prefixes = (
+        package_root + "/Editor",
+        package_root + "/Tests/Editor",
+    )
     findings: List[Finding] = []
     all_meta_paths = sorted(
         path for path in context.tracked_files if path.endswith(".meta")
@@ -2511,7 +2764,7 @@ def check_unity_metadata(context: RepositoryContext) -> List[Finding]:
     code_assets = sorted(
         path
         for path in context.tracked_files
-        if path.startswith(editor_prefix + "/")
+        if any(path.startswith(prefix + "/") for prefix in code_prefixes)
         and (path.endswith(".cs") or path.endswith(".asmdef"))
     )
     relevant_directories: Set[str] = set()
@@ -2570,7 +2823,11 @@ def check_unity_metadata(context: RepositoryContext) -> List[Finding]:
             )
 
     for meta_path in all_meta_paths:
-        if not (meta_path == editor_prefix + ".meta" or meta_path.startswith(editor_prefix + "/")):
+        if not any(
+            meta_path == prefix + ".meta"
+            or meta_path.startswith(prefix + "/")
+            for prefix in code_prefixes
+        ):
             continue
         asset_path = meta_path[: -len(".meta")]
         has_tracked_asset = context.is_tracked(asset_path)

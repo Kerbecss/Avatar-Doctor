@@ -73,7 +73,20 @@
   },
   "requiredPackageFiles": [
     "CHANGELOG.md",
+    "Editor/AssemblyInfo.cs",
+    "Editor/AssemblyInfo.cs.meta",
     "Editor/Core/AvatarDoctorPackageInfo.cs",
+    "Editor/Discovery.meta",
+    "Editor/Discovery/AvatarDiscoveryCandidate.cs",
+    "Editor/Discovery/AvatarDiscoveryCandidate.cs.meta",
+    "Editor/Discovery/AvatarDiscoveryCandidateComparer.cs",
+    "Editor/Discovery/AvatarDiscoveryCandidateComparer.cs.meta",
+    "Editor/Discovery/AvatarDiscoveryResult.cs",
+    "Editor/Discovery/AvatarDiscoveryResult.cs.meta",
+    "Editor/Discovery/AvatarDiscoveryService.cs",
+    "Editor/Discovery/AvatarDiscoveryService.cs.meta",
+    "Editor/Discovery/AvatarDiscoveryState.cs",
+    "Editor/Discovery/AvatarDiscoveryState.cs.meta",
     "Editor/Integrations.meta",
     "Editor/Integrations/VRChat.meta",
     "Editor/Integrations/VRChat/VRChatAvatarDescriptorBoundary.cs",
@@ -84,15 +97,57 @@
     "Editor/Teyocesu.AvatarDoctor.Editor.asmdef",
     "LICENSE.md",
     "README.md",
+    "Tests.meta",
+    "Tests/Editor.meta",
+    "Tests/Editor/AvatarDiscoveryOrderingTests.cs",
+    "Tests/Editor/AvatarDiscoveryOrderingTests.cs.meta",
+    "Tests/Editor/AvatarDiscoveryResultTests.cs",
+    "Tests/Editor/AvatarDiscoveryResultTests.cs.meta",
+    "Tests/Editor/AvatarDiscoveryServiceTests.cs",
+    "Tests/Editor/AvatarDiscoveryServiceTests.cs.meta",
+    "Tests/Editor/Teyocesu.AvatarDoctor.Editor.Tests.asmdef",
+    "Tests/Editor/Teyocesu.AvatarDoctor.Editor.Tests.asmdef.meta",
     "package.json"
   ],
   "allowedAssemblyDefinitions": [
     {
+      "kind": "production",
       "path": "Packages/com.teyocesu.avatar-doctor/Editor/Teyocesu.AvatarDoctor.Editor.asmdef",
       "name": "Teyocesu.AvatarDoctor.Editor",
       "rootNamespace": "Teyocesu.AvatarDoctor.Editor",
       "includePlatforms": [
         "Editor"
+      ],
+      "references": [
+        "VRC.SDK3A"
+      ],
+      "precompiledReferences": [],
+      "autoReferenced": true,
+      "defineConstraints": [],
+      "optionalUnityReferences": []
+    },
+    {
+      "kind": "editorTest",
+      "path": "Packages/com.teyocesu.avatar-doctor/Tests/Editor/Teyocesu.AvatarDoctor.Editor.Tests.asmdef",
+      "name": "Teyocesu.AvatarDoctor.Editor.Tests",
+      "rootNamespace": "Teyocesu.AvatarDoctor.Editor.Tests",
+      "includePlatforms": [
+        "Editor"
+      ],
+      "references": [
+        "Teyocesu.AvatarDoctor.Editor",
+        "VRC.SDK3A"
+      ],
+      "precompiledReferences": [
+        "VRCSDK3A.dll",
+        "VRCSDKBase.dll"
+      ],
+      "autoReferenced": false,
+      "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+      ],
+      "optionalUnityReferences": [
+        "TestAssemblies"
       ]
     }
   ],
@@ -100,8 +155,47 @@
     "Teyocesu.AvatarDoctor.Editor"
   ],
   "sourceProfiles": {
+    "Packages/com.teyocesu.avatar-doctor/Editor/AssemblyInfo.cs": {
+      "profile": "friendAssembly",
+      "allowedProhibitedCodePatterns": [
+        "Method or invocation syntax"
+      ]
+    },
     "Packages/com.teyocesu.avatar-doctor/Editor/Core/AvatarDoctorPackageInfo.cs": {
       "profile": "constantsOnly",
+      "allowedProhibitedCodePatterns": []
+    },
+    "Packages/com.teyocesu.avatar-doctor/Editor/Discovery/AvatarDiscoveryCandidate.cs": {
+      "profile": "discoveryCandidate",
+      "allowedProhibitedCodePatterns": [
+        "Unity runtime API",
+        "Runtime object API",
+        "Method or invocation syntax"
+      ]
+    },
+    "Packages/com.teyocesu.avatar-doctor/Editor/Discovery/AvatarDiscoveryCandidateComparer.cs": {
+      "profile": "discoveryOrdering",
+      "allowedProhibitedCodePatterns": [
+        "Method or invocation syntax"
+      ]
+    },
+    "Packages/com.teyocesu.avatar-doctor/Editor/Discovery/AvatarDiscoveryResult.cs": {
+      "profile": "discoveryResult",
+      "allowedProhibitedCodePatterns": [
+        "Method or invocation syntax"
+      ]
+    },
+    "Packages/com.teyocesu.avatar-doctor/Editor/Discovery/AvatarDiscoveryService.cs": {
+      "profile": "discoveryService",
+      "allowedProhibitedCodePatterns": [
+        "Unity Editor API",
+        "Unity runtime API",
+        "Scene API",
+        "Method or invocation syntax"
+      ]
+    },
+    "Packages/com.teyocesu.avatar-doctor/Editor/Discovery/AvatarDiscoveryState.cs": {
+      "profile": "discoveryState",
       "allowedProhibitedCodePatterns": []
     },
     "Packages/com.teyocesu.avatar-doctor/Editor/UI/AvatarDoctorWindow.cs": {
@@ -115,8 +209,51 @@
       ]
     },
     "Packages/com.teyocesu.avatar-doctor/Editor/Integrations/VRChat/VRChatAvatarDescriptorBoundary.cs": {
-      "profile": "vrchatSdkBoundary",
+      "profile": "vrchatDiscoveryBoundary",
       "allowedProhibitedCodePatterns": [
+        "Unity runtime API",
+        "Scene API",
+        "Runtime object API",
+        "VRChat SDK type",
+        "Method or invocation syntax"
+      ]
+    },
+    "Packages/com.teyocesu.avatar-doctor/Tests/Editor/AvatarDiscoveryOrderingTests.cs": {
+      "profile": "phase2EditorTests",
+      "allowedProhibitedCodePatterns": [
+        "Unity Editor API",
+        "Unity runtime API",
+        "Asset access",
+        "Editor mutation",
+        "Scene API",
+        "Runtime object API",
+        "VRChat SDK type",
+        "Method or invocation syntax"
+      ]
+    },
+    "Packages/com.teyocesu.avatar-doctor/Tests/Editor/AvatarDiscoveryResultTests.cs": {
+      "profile": "phase2EditorTests",
+      "allowedProhibitedCodePatterns": [
+        "Unity Editor API",
+        "Unity runtime API",
+        "Asset access",
+        "Editor mutation",
+        "Scene API",
+        "Runtime object API",
+        "VRChat SDK type",
+        "Method or invocation syntax"
+      ]
+    },
+    "Packages/com.teyocesu.avatar-doctor/Tests/Editor/AvatarDiscoveryServiceTests.cs": {
+      "profile": "phase2FixtureEditorTests",
+      "allowedProhibitedCodePatterns": [
+        "Unity Editor API",
+        "Unity runtime API",
+        "Asset access",
+        "Editor mutation",
+        "Scene API",
+        "Runtime object API",
+        "File I/O",
         "VRChat SDK type",
         "Method or invocation syntax"
       ]

@@ -33,15 +33,15 @@
 
 ## Current status
 
-Phase 1 SDK integration boundary implemented and validated; awaiting independent review.
+Phase 2 scene avatar discovery implemented and validated; awaiting independent review.
 
 ## Last completed work
 
-Phase 1 implementation and local/Unity validation.
+Phase 2 implementation and validation.
 
 ## Next gate
 
-Independent Phase 1 review before Phase 2 — Scene avatar discovery.
+Independent Phase 2 review before Phase 3 — Selection model.
 
 ## Known blockers
 

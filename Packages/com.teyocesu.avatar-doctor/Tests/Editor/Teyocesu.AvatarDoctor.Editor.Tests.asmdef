@@ -1,0 +1,27 @@
+{
+  "name": "Teyocesu.AvatarDoctor.Editor.Tests",
+  "rootNamespace": "Teyocesu.AvatarDoctor.Editor.Tests",
+  "references": [
+    "Teyocesu.AvatarDoctor.Editor",
+    "VRC.SDK3A"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [
+    "VRCSDK3A.dll",
+    "VRCSDKBase.dll"
+  ],
+  "autoReferenced": false,
+  "defineConstraints": [
+    "UNITY_INCLUDE_TESTS"
+  ],
+  "versionDefines": [],
+  "noEngineReferences": false,
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ]
+}

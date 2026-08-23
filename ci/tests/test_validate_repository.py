@@ -16,6 +16,7 @@ import validate_repository as validator  # noqa: E402
 
 
 POLICY_PATH = Path(__file__).resolve().parents[1] / "validation-policy.json"
+REPOSITORY_ROOT = POLICY_PATH.parent.parent
 
 
 class PlanningContractTests(unittest.TestCase):
@@ -236,7 +237,103 @@ class SdkBoundaryContractTests(unittest.TestCase):
             findings = validator.validate_sdk_assembly_references(
                 context, assembly_path, assembly
             )
-            self.assertTrue(any("outside the approved SDK boundary" in item.message for item in findings))
+            self.assertTrue(
+                any(
+                    "outside the approved production SDK boundary" in item.message
+                    for item in findings
+                )
+            )
+
+    def test_vrchat_fixture_plugin_pair_passes_for_editor_tests_only(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            context = self.create_context(Path(temporary))
+            assembly_path = context.policy["allowedAssemblyDefinitions"][1]["path"]
+            assembly = {
+                "references": ["Teyocesu.AvatarDoctor.Editor", "VRC.SDK3A"],
+                "precompiledReferences": ["VRCSDK3A.dll", "VRCSDKBase.dll"],
+            }
+            self.assertEqual(
+                validator.validate_sdk_assembly_references(
+                    context, assembly_path, assembly
+                ),
+                [],
+            )
+
+    def test_descriptor_plugin_reference_fails_for_production(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            context = self.create_context(Path(temporary))
+            assembly_path = context.policy["allowedAssemblyDefinitions"][0]["path"]
+            assembly = {
+                "references": ["VRC.SDK3A"],
+                "precompiledReferences": ["VRCSDK3A.dll"],
+            }
+            findings = validator.validate_sdk_assembly_references(
+                context, assembly_path, assembly
+            )
+            self.assertTrue(
+                any(
+                    "Precompiled assembly references" in item.message
+                    for item in findings
+                )
+            )
+
+    def test_editor_tests_missing_vrcsdk3a_plugin_reference_fail(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            context = self.create_context(Path(temporary))
+            assembly_path = context.policy["allowedAssemblyDefinitions"][1]["path"]
+            assembly = {
+                "references": ["Teyocesu.AvatarDoctor.Editor", "VRC.SDK3A"],
+                "precompiledReferences": ["VRCSDKBase.dll"],
+            }
+            findings = validator.validate_sdk_assembly_references(
+                context, assembly_path, assembly
+            )
+            self.assertTrue(
+                any(
+                    "Precompiled assembly references" in item.message
+                    for item in findings
+                )
+            )
+
+    def test_editor_tests_missing_vrcsdkbase_plugin_reference_fail(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            context = self.create_context(Path(temporary))
+            assembly_path = context.policy["allowedAssemblyDefinitions"][1]["path"]
+            assembly = {
+                "references": ["Teyocesu.AvatarDoctor.Editor", "VRC.SDK3A"],
+                "precompiledReferences": ["VRCSDK3A.dll"],
+            }
+            findings = validator.validate_sdk_assembly_references(
+                context, assembly_path, assembly
+            )
+            self.assertTrue(
+                any(
+                    "Precompiled assembly references" in item.message
+                    for item in findings
+                )
+            )
+
+    def test_editor_tests_with_extra_vrchat_plugin_reference_fail(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            context = self.create_context(Path(temporary))
+            assembly_path = context.policy["allowedAssemblyDefinitions"][1]["path"]
+            assembly = {
+                "references": ["Teyocesu.AvatarDoctor.Editor", "VRC.SDK3A"],
+                "precompiledReferences": [
+                    "VRCSDK3A.dll",
+                    "VRCSDKBase.dll",
+                    "VRCSDKBase-Editor.dll",
+                ],
+            }
+            findings = validator.validate_sdk_assembly_references(
+                context, assembly_path, assembly
+            )
+            self.assertTrue(
+                any(
+                    "Precompiled assembly references" in item.message
+                    for item in findings
+                )
+            )
 
     def test_vendored_dll_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -258,6 +355,193 @@ class SdkBoundaryContractTests(unittest.TestCase):
             self.assertTrue(
                 any(
                     item.path == required_source and "is not tracked" in item.message
+                    for item in findings
+                )
+            )
+
+
+class Phase2PackageContractTests(unittest.TestCase):
+    def create_context(
+        self,
+        root: Path,
+        documents: dict[str, str],
+    ) -> validator.RepositoryContext:
+        policy = json.loads(POLICY_PATH.read_text(encoding="utf-8"))
+        tracked_files = []
+        for relative_path, content in documents.items():
+            destination = root.joinpath(*PurePosixPath(relative_path).parts)
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_text(content, encoding="utf-8", newline="\n")
+            tracked_files.append(relative_path)
+        return validator.RepositoryContext(root, policy, tracked_files)
+
+    def approved_source_documents(self) -> dict[str, str]:
+        policy = json.loads(POLICY_PATH.read_text(encoding="utf-8"))
+        return {
+            relative_path: REPOSITORY_ROOT.joinpath(
+                *PurePosixPath(relative_path).parts
+            ).read_text(encoding="utf-8")
+            for relative_path in policy["sourceProfiles"]
+        }
+
+    def approved_assembly_documents(self) -> dict[str, str]:
+        policy = json.loads(POLICY_PATH.read_text(encoding="utf-8"))
+        return {
+            entry["path"]: REPOSITORY_ROOT.joinpath(
+                *PurePosixPath(entry["path"]).parts
+            ).read_text(encoding="utf-8")
+            for entry in policy["allowedAssemblyDefinitions"]
+        }
+
+    def test_approved_phase2_source_structure_passes(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            context = self.create_context(
+                Path(temporary),
+                self.approved_source_documents(),
+            )
+            self.assertEqual(validator.check_source(context), [])
+
+    def test_unexpected_production_source_fails(self) -> None:
+        documents = self.approved_source_documents()
+        unexpected_path = (
+            "Packages/com.teyocesu.avatar-doctor/Editor/Discovery/Future.cs"
+        )
+        documents[unexpected_path] = (
+            "namespace Teyocesu.AvatarDoctor.Editor.Discovery\n"
+            "{\n"
+            "    internal sealed class Future { }\n"
+            "}\n"
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            context = self.create_context(Path(temporary), documents)
+            findings = validator.check_source(context)
+            self.assertTrue(
+                any(
+                    item.path == unexpected_path
+                    and "no file-specific policy profile" in item.message
+                    for item in findings
+                )
+            )
+
+    def test_forbidden_public_production_type_fails(self) -> None:
+        documents = self.approved_source_documents()
+        candidate_path = (
+            "Packages/com.teyocesu.avatar-doctor/Editor/Discovery/"
+            "AvatarDiscoveryCandidate.cs"
+        )
+        documents[candidate_path] = documents[candidate_path].replace(
+            "internal sealed class AvatarDiscoveryCandidate",
+            "public sealed class AvatarDiscoveryCandidate",
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            context = self.create_context(Path(temporary), documents)
+            findings = validator.check_source(context)
+            self.assertTrue(
+                any(
+                    item.path == candidate_path
+                    and "Public C# type declarations" in item.message
+                    for item in findings
+                )
+            )
+
+    def test_detectable_discovery_mutation_api_fails(self) -> None:
+        documents = self.approved_source_documents()
+        service_path = (
+            "Packages/com.teyocesu.avatar-doctor/Editor/Discovery/"
+            "AvatarDiscoveryService.cs"
+        )
+        documents[service_path] += "\n// Undo.RecordObject would mutate project state.\n"
+        with tempfile.TemporaryDirectory() as temporary:
+            context = self.create_context(Path(temporary), documents)
+            findings = validator.check_source(context)
+            self.assertTrue(
+                any(
+                    item.path == service_path
+                    and "detectable" in item.message.casefold()
+                    and "mutation" in item.message.casefold()
+                    for item in findings
+                )
+            )
+
+    def test_file_io_in_production_discovery_fails(self) -> None:
+        documents = self.approved_source_documents()
+        service_path = (
+            "Packages/com.teyocesu.avatar-doctor/Editor/Discovery/"
+            "AvatarDiscoveryService.cs"
+        )
+        documents[service_path] += "\n// System.IO.File.ReadAllBytes is forbidden.\n"
+        with tempfile.TemporaryDirectory() as temporary:
+            context = self.create_context(Path(temporary), documents)
+            findings = validator.check_source(context)
+            self.assertTrue(
+                any(
+                    item.path == service_path
+                    and "Prohibited File I/O pattern" in item.message
+                    for item in findings
+                )
+            )
+
+    def test_approved_phase2_assembly_structure_passes(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            context = self.create_context(
+                Path(temporary),
+                self.approved_assembly_documents(),
+            )
+            self.assertEqual(validator.check_assembly(context), [])
+
+    def test_unexpected_runtime_assembly_fails(self) -> None:
+        runtime_path = (
+            "Packages/com.teyocesu.avatar-doctor/Runtime/Unexpected.asmdef"
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            context = self.create_context(
+                Path(temporary),
+                {runtime_path: '{"name": "Unexpected"}\n'},
+            )
+            findings = validator.check_structure(context)
+            self.assertTrue(
+                any("Runtime assembly is present" in item.message for item in findings)
+            )
+
+    def test_unexpected_test_assembly_fails(self) -> None:
+        documents = self.approved_assembly_documents()
+        unexpected_path = (
+            "Packages/com.teyocesu.avatar-doctor/Tests/Editor/"
+            "Unexpected.Tests.asmdef"
+        )
+        documents[unexpected_path] = '{"name": "Unexpected.Tests"}\n'
+        with tempfile.TemporaryDirectory() as temporary:
+            context = self.create_context(Path(temporary), documents)
+            findings = validator.check_assembly(context)
+            self.assertTrue(
+                any(
+                    item.path == unexpected_path
+                    and "not allowed by policy" in item.message
+                    for item in findings
+                )
+            )
+
+    def test_forbidden_future_scope_directory_fails(self) -> None:
+        future_path = (
+            "Packages/com.teyocesu.avatar-doctor/Editor/Scanning/Future.cs"
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            context = self.create_context(
+                Path(temporary),
+                {
+                    future_path: (
+                        "namespace Teyocesu.AvatarDoctor.Editor.Scanning\n"
+                        "{\n"
+                        "    internal sealed class Future { }\n"
+                        "}\n"
+                    )
+                },
+            )
+            findings = validator.check_structure(context)
+            self.assertTrue(
+                any(
+                    item.path == future_path
+                    and "Future package directory" in item.message
                     for item in findings
                 )
             )
