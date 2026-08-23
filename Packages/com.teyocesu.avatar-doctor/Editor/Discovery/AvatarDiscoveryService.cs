@@ -47,5 +47,11 @@ namespace Teyocesu.AvatarDoctor.Editor.Discovery
                 && scene.isLoaded
                 && !EditorSceneManager.IsPreviewScene(scene);
         }
+
+        internal static bool IsCandidateLive(
+            AvatarDiscoveryCandidate candidate)
+        {
+            return VRChatAvatarDescriptorBoundary.IsCandidateLive(candidate);
+        }
     }
 }

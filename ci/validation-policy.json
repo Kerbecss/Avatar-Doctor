@@ -87,6 +87,15 @@
     "Editor/Discovery/AvatarDiscoveryService.cs.meta",
     "Editor/Discovery/AvatarDiscoveryState.cs",
     "Editor/Discovery/AvatarDiscoveryState.cs.meta",
+    "Editor/Selection.meta",
+    "Editor/Selection/AvatarSelection.cs",
+    "Editor/Selection/AvatarSelection.cs.meta",
+    "Editor/Selection/AvatarSelectionModel.cs",
+    "Editor/Selection/AvatarSelectionModel.cs.meta",
+    "Editor/Selection/AvatarSelectionOrigin.cs",
+    "Editor/Selection/AvatarSelectionOrigin.cs.meta",
+    "Editor/Selection/AvatarSelectionState.cs",
+    "Editor/Selection/AvatarSelectionState.cs.meta",
     "Editor/Integrations.meta",
     "Editor/Integrations/VRChat.meta",
     "Editor/Integrations/VRChat/VRChatAvatarDescriptorBoundary.cs",
@@ -99,6 +108,12 @@
     "README.md",
     "Tests.meta",
     "Tests/Editor.meta",
+    "Tests/Editor/AvatarSelectionIntegrationTests.cs",
+    "Tests/Editor/AvatarSelectionIntegrationTests.cs.meta",
+    "Tests/Editor/AvatarSelectionModelTests.cs",
+    "Tests/Editor/AvatarSelectionModelTests.cs.meta",
+    "Tests/Editor/AvatarSelectionTests.cs",
+    "Tests/Editor/AvatarSelectionTests.cs.meta",
     "Tests/Editor/AvatarDiscoveryOrderingTests.cs",
     "Tests/Editor/AvatarDiscoveryOrderingTests.cs.meta",
     "Tests/Editor/AvatarDiscoveryResultTests.cs",
@@ -198,6 +213,34 @@
       "profile": "discoveryState",
       "allowedProhibitedCodePatterns": []
     },
+    "Packages/com.teyocesu.avatar-doctor/Editor/Selection/AvatarSelection.cs": {
+      "profile": "selectionContract",
+      "allowedProhibitedCodePatterns": [
+        "Editor selection",
+        "Method or invocation syntax"
+      ]
+    },
+    "Packages/com.teyocesu.avatar-doctor/Editor/Selection/AvatarSelectionModel.cs": {
+      "profile": "selectionModel",
+      "allowedProhibitedCodePatterns": [
+        "Unity runtime API",
+        "Editor selection",
+        "Runtime object API",
+        "Method or invocation syntax"
+      ]
+    },
+    "Packages/com.teyocesu.avatar-doctor/Editor/Selection/AvatarSelectionOrigin.cs": {
+      "profile": "selectionEnum",
+      "allowedProhibitedCodePatterns": [
+        "Editor selection"
+      ]
+    },
+    "Packages/com.teyocesu.avatar-doctor/Editor/Selection/AvatarSelectionState.cs": {
+      "profile": "selectionEnum",
+      "allowedProhibitedCodePatterns": [
+        "Editor selection"
+      ]
+    },
     "Packages/com.teyocesu.avatar-doctor/Editor/UI/AvatarDoctorWindow.cs": {
       "profile": "editorWindowShell",
       "allowedProhibitedCodePatterns": [
@@ -255,6 +298,38 @@
         "Runtime object API",
         "File I/O",
         "VRChat SDK type",
+        "Method or invocation syntax"
+      ]
+    },
+    "Packages/com.teyocesu.avatar-doctor/Tests/Editor/AvatarSelectionIntegrationTests.cs": {
+      "profile": "phase3FixtureEditorTests",
+      "allowedProhibitedCodePatterns": [
+        "Unity Editor API",
+        "Unity runtime API",
+        "Asset access",
+        "Editor selection",
+        "Editor mutation",
+        "Scene API",
+        "Runtime object API",
+        "VRChat SDK type",
+        "Method or invocation syntax"
+      ]
+    },
+    "Packages/com.teyocesu.avatar-doctor/Tests/Editor/AvatarSelectionModelTests.cs": {
+      "profile": "phase3SelectionTests",
+      "allowedProhibitedCodePatterns": [
+        "Unity runtime API",
+        "Editor selection",
+        "Runtime object API",
+        "Method or invocation syntax"
+      ]
+    },
+    "Packages/com.teyocesu.avatar-doctor/Tests/Editor/AvatarSelectionTests.cs": {
+      "profile": "phase3SelectionTests",
+      "allowedProhibitedCodePatterns": [
+        "Unity runtime API",
+        "Editor selection",
+        "Runtime object API",
         "Method or invocation syntax"
       ]
     }

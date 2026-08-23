@@ -360,7 +360,7 @@ class SdkBoundaryContractTests(unittest.TestCase):
             )
 
 
-class Phase2PackageContractTests(unittest.TestCase):
+class Phase3PackageContractTests(unittest.TestCase):
     def create_context(
         self,
         root: Path,
@@ -393,7 +393,7 @@ class Phase2PackageContractTests(unittest.TestCase):
             for entry in policy["allowedAssemblyDefinitions"]
         }
 
-    def test_approved_phase2_source_structure_passes(self) -> None:
+    def test_approved_phase3_source_structure_passes(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             context = self.create_context(
                 Path(temporary),
@@ -419,6 +419,29 @@ class Phase2PackageContractTests(unittest.TestCase):
                 any(
                     item.path == unexpected_path
                     and "no file-specific policy profile" in item.message
+                    for item in findings
+                )
+            )
+
+    def test_unexpected_selection_source_path_fails(self) -> None:
+        documents = self.approved_source_documents()
+        unexpected_path = (
+            "Packages/com.teyocesu.avatar-doctor/Editor/Selection/"
+            "FutureSelection.cs"
+        )
+        documents[unexpected_path] = (
+            "namespace Teyocesu.AvatarDoctor.Editor.Selection\n"
+            "{\n"
+            "    internal sealed class FutureSelection { }\n"
+            "}\n"
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            context = self.create_context(Path(temporary), documents)
+            findings = validator.check_structure(context)
+            self.assertTrue(
+                any(
+                    item.path == unexpected_path
+                    and "declarative allowlist" in item.message
                     for item in findings
                 )
             )
@@ -481,7 +504,117 @@ class Phase2PackageContractTests(unittest.TestCase):
                 )
             )
 
-    def test_approved_phase2_assembly_structure_passes(self) -> None:
+    def test_vrchat_sdk_type_in_selection_source_fails(self) -> None:
+        documents = self.approved_source_documents()
+        model_path = (
+            "Packages/com.teyocesu.avatar-doctor/Editor/Selection/"
+            "AvatarSelectionModel.cs"
+        )
+        documents[model_path] += "\n// VRCAvatarDescriptor must not leak here.\n"
+        with tempfile.TemporaryDirectory() as temporary:
+            context = self.create_context(Path(temporary), documents)
+            findings = validator.check_source(context)
+            self.assertTrue(
+                any(
+                    item.path == model_path
+                    and "Prohibited VRChat SDK type pattern" in item.message
+                    for item in findings
+                )
+            )
+
+    def test_persistence_in_selection_source_fails(self) -> None:
+        documents = self.approved_source_documents()
+        model_path = (
+            "Packages/com.teyocesu.avatar-doctor/Editor/Selection/"
+            "AvatarSelectionModel.cs"
+        )
+        documents[model_path] += "\n// SessionState.SetString would persist state.\n"
+        with tempfile.TemporaryDirectory() as temporary:
+            context = self.create_context(Path(temporary), documents)
+            findings = validator.check_source(context)
+            self.assertTrue(
+                any(
+                    item.path == model_path
+                    and "persistent Editor state" in item.message
+                    for item in findings
+                )
+            )
+
+    def test_event_subscription_in_selection_source_fails(self) -> None:
+        documents = self.approved_source_documents()
+        model_path = (
+            "Packages/com.teyocesu.avatar-doctor/Editor/Selection/"
+            "AvatarSelectionModel.cs"
+        )
+        documents[model_path] += (
+            "\n// Selection.selectionChanged += HandleSelection;\n"
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            context = self.create_context(Path(temporary), documents)
+            findings = validator.check_source(context)
+            self.assertTrue(
+                any(
+                    item.path == model_path
+                    and "callback or event subscription" in item.message
+                    for item in findings
+                )
+            )
+
+    def test_polling_in_selection_source_fails(self) -> None:
+        documents = self.approved_source_documents()
+        model_path = (
+            "Packages/com.teyocesu.avatar-doctor/Editor/Selection/"
+            "AvatarSelectionModel.cs"
+        )
+        documents[model_path] += "\n// void Update() would poll.\n"
+        with tempfile.TemporaryDirectory() as temporary:
+            context = self.create_context(Path(temporary), documents)
+            findings = validator.check_source(context)
+            self.assertTrue(
+                any(
+                    item.path == model_path
+                    and "polling or lifecycle callback" in item.message
+                    for item in findings
+                )
+            )
+
+    def test_editor_selection_mutation_in_selection_source_fails(self) -> None:
+        documents = self.approved_source_documents()
+        model_path = (
+            "Packages/com.teyocesu.avatar-doctor/Editor/Selection/"
+            "AvatarSelectionModel.cs"
+        )
+        documents[model_path] += "\n// Selection.activeObject = avatarRoot;\n"
+        with tempfile.TemporaryDirectory() as temporary:
+            context = self.create_context(Path(temporary), documents)
+            findings = validator.check_source(context)
+            self.assertTrue(
+                any(
+                    item.path == model_path
+                    and "Unity Editor selection mutation" in item.message
+                    for item in findings
+                )
+            )
+
+    def test_unity_mutation_in_selection_source_fails(self) -> None:
+        documents = self.approved_source_documents()
+        model_path = (
+            "Packages/com.teyocesu.avatar-doctor/Editor/Selection/"
+            "AvatarSelectionModel.cs"
+        )
+        documents[model_path] += "\n// gameObject.SetActive(false) would mutate.\n"
+        with tempfile.TemporaryDirectory() as temporary:
+            context = self.create_context(Path(temporary), documents)
+            findings = validator.check_source(context)
+            self.assertTrue(
+                any(
+                    item.path == model_path
+                    and "GameObject or Component mutation" in item.message
+                    for item in findings
+                )
+            )
+
+    def test_approved_phase3_assembly_structure_passes(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             context = self.create_context(
                 Path(temporary),

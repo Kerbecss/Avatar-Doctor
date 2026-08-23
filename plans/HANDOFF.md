@@ -33,15 +33,15 @@
 
 ## Current status
 
-Phase 2 scene avatar discovery implemented and validated; awaiting independent review.
+Phase 3 selection model implemented and validated; awaiting independent review.
 
 ## Last completed work
 
-Phase 2 implementation and validation.
+Phase 3 implementation and validation.
 
 ## Next gate
 
-Independent Phase 2 review before Phase 3 — Selection model.
+Independent Phase 3 review before Phase 4 — Editor window discovery UI.
 
 ## Known blockers
 

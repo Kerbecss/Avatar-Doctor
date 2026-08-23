@@ -708,7 +708,7 @@ def load_policy(root: Path) -> Dict[str, Any]:
     ]
     if policy["allowedAssemblyDefinitions"] != expected_assembly_definitions:
         raise ValidatorConfigurationError(
-            "allowedAssemblyDefinitions must declare the exact production and Phase 2 Editor test assemblies."
+            "allowedAssemblyDefinitions must declare the exact production and Phase 3 Editor test assemblies."
         )
 
     source_profiles = policy["sourceProfiles"]
@@ -725,6 +725,14 @@ def load_policy(root: Path) -> Dict[str, Any]:
         + "/Editor/Discovery/AvatarDiscoveryService.cs": "discoveryService",
         package_root
         + "/Editor/Discovery/AvatarDiscoveryState.cs": "discoveryState",
+        package_root
+        + "/Editor/Selection/AvatarSelection.cs": "selectionContract",
+        package_root
+        + "/Editor/Selection/AvatarSelectionModel.cs": "selectionModel",
+        package_root
+        + "/Editor/Selection/AvatarSelectionOrigin.cs": "selectionEnum",
+        package_root
+        + "/Editor/Selection/AvatarSelectionState.cs": "selectionEnum",
         package_root + "/Editor/UI/AvatarDoctorWindow.cs": "editorWindowShell",
         sdk_boundary["sourcePath"]: "vrchatDiscoveryBoundary",
         package_root
@@ -733,6 +741,12 @@ def load_policy(root: Path) -> Dict[str, Any]:
         + "/Tests/Editor/AvatarDiscoveryResultTests.cs": "phase2EditorTests",
         package_root
         + "/Tests/Editor/AvatarDiscoveryServiceTests.cs": "phase2FixtureEditorTests",
+        package_root
+        + "/Tests/Editor/AvatarSelectionIntegrationTests.cs": "phase3FixtureEditorTests",
+        package_root
+        + "/Tests/Editor/AvatarSelectionModelTests.cs": "phase3SelectionTests",
+        package_root
+        + "/Tests/Editor/AvatarSelectionTests.cs": "phase3SelectionTests",
     }
     if not isinstance(source_profiles, dict) or set(source_profiles) != set(
         expected_source_profiles
@@ -760,6 +774,17 @@ def load_policy(root: Path) -> Dict[str, Any]:
             "Method or invocation syntax",
         },
         "discoveryState": set(),
+        "selectionContract": {
+            "Editor selection",
+            "Method or invocation syntax",
+        },
+        "selectionEnum": {"Editor selection"},
+        "selectionModel": {
+            "Unity runtime API",
+            "Editor selection",
+            "Runtime object API",
+            "Method or invocation syntax",
+        },
         "editorWindowShell": {
             "Unity Editor API",
             "Unity runtime API",
@@ -792,6 +817,23 @@ def load_policy(root: Path) -> Dict[str, Any]:
             "Scene API",
             "Runtime object API",
             "File I/O",
+            "VRChat SDK type",
+            "Method or invocation syntax",
+        },
+        "phase3SelectionTests": {
+            "Unity runtime API",
+            "Editor selection",
+            "Runtime object API",
+            "Method or invocation syntax",
+        },
+        "phase3FixtureEditorTests": {
+            "Unity Editor API",
+            "Unity runtime API",
+            "Asset access",
+            "Editor selection",
+            "Editor mutation",
+            "Scene API",
+            "Runtime object API",
             "VRChat SDK type",
             "Method or invocation syntax",
         },
@@ -1512,26 +1554,28 @@ def check_structure(context: RepositoryContext) -> List[Finding]:
                 )
             )
 
-    phase2_scoped_prefixes = (
+    phase3_scoped_prefixes = (
         package_root + "/Editor/Discovery/",
+        package_root + "/Editor/Selection/",
         package_root + "/Tests/",
     )
-    allowed_phase2_scoped_paths = {
+    allowed_phase3_scoped_paths = {
         package_root + "/" + relative_path
         for relative_path in policy["requiredPackageFiles"]
         if relative_path.startswith("Editor/Discovery/")
+        or relative_path.startswith("Editor/Selection/")
         or relative_path.startswith("Tests/")
     }
     for relative_path in context.tracked_files:
         if relative_path.startswith(
-            phase2_scoped_prefixes
-        ) and relative_path not in allowed_phase2_scoped_paths:
+            phase3_scoped_prefixes
+        ) and relative_path not in allowed_phase3_scoped_paths:
             findings.append(
                 finding(
                     check_id,
                     relative_path,
-                    "Phase 2 package path is not in the declarative allowlist.",
-                    "Only approved discovery and Editor test artifacts",
+                    "Phase 3 package path is not in the declarative allowlist.",
+                    "Only approved discovery, selection, and Editor test artifacts",
                 )
             )
 
@@ -1643,7 +1687,7 @@ def validate_sdk_assembly_references(
         boundary_label = (
             "production SDK boundary"
             if configuration["kind"] == "production"
-            else "Phase 2 Editor test boundary"
+            else "Phase 3 Editor test boundary"
         )
         findings.append(
             finding(
@@ -2077,13 +2121,13 @@ def check_friend_assembly_source_profile(
         finding(
             "SOURCE",
             source_path,
-            "Friend-assembly declaration is outside the exact Phase 2 boundary.",
+            "Friend-assembly declaration is outside the exact Phase 3 boundary.",
             "InternalsVisibleTo for Teyocesu.AvatarDoctor.Editor.Tests only",
         )
     ]
 
 
-def check_phase2_discovery_read_only_source(
+def check_read_only_product_source(
     source_path: str, source: str
 ) -> List[Finding]:
     mutation_patterns = (
@@ -2122,7 +2166,46 @@ def check_phase2_discovery_read_only_source(
                     "SOURCE",
                     source_path,
                     "Detectable {0} found at line {1}.".format(label, line),
-                    "Read-only Phase 2 discovery production source",
+                    "Read-only Phase 3 production source",
+                )
+            )
+    return findings
+
+
+def check_phase3_selection_source(
+    source_path: str, source: str
+) -> List[Finding]:
+    forbidden_patterns = (
+        (
+            r"\b(?:EditorPrefs|SessionState)\b",
+            "persistent Editor state",
+        ),
+        (
+            r"(?:\bSelection\s*\.\s*selectionChanged\b|"
+            r"\bEditorApplication\b|\+=|-=|\bRegisterCallback\s*\()",
+            "callback or event subscription",
+        ),
+        (
+            r"\b(?:Update|OnInspectorUpdate|OnHierarchyChange|"
+            r"OnSelectionChange|OnProjectChange)\s*\(",
+            "polling or lifecycle callback",
+        ),
+        (
+            r"\bSelection\s*\.\s*(?:activeObject|activeGameObject|objects)\s*=",
+            "Unity Editor selection mutation",
+        ),
+    )
+    findings: List[Finding] = []
+    for pattern, label in forbidden_patterns:
+        match = re.search(pattern, source)
+        if match:
+            line = source.count("\n", 0, match.start()) + 1
+            findings.append(
+                finding(
+                    "SOURCE",
+                    source_path,
+                    "Detectable {0} found at line {1}.".format(label, line),
+                    "Explicit read-only selection operations only",
                 )
             )
     return findings
@@ -2192,10 +2275,21 @@ def check_source(context: RepositoryContext) -> List[Finding]:
                 "discoveryResult",
                 "discoveryService",
                 "discoveryState",
+                "selectionContract",
+                "selectionEnum",
+                "selectionModel",
                 "vrchatDiscoveryBoundary",
             }:
                 findings.extend(
-                    check_phase2_discovery_read_only_source(source_path, source)
+                    check_read_only_product_source(source_path, source)
+                )
+            if profile_name in {
+                "selectionContract",
+                "selectionEnum",
+                "selectionModel",
+            }:
+                findings.extend(
+                    check_phase3_selection_source(source_path, source)
                 )
 
         namespaces = re.findall(
