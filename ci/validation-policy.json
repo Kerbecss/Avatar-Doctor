@@ -43,9 +43,41 @@
     "plan": "plans/v0.1.0.md",
     "handoff": "plans/HANDOFF.md"
   },
+  "sdkBoundary": {
+    "packageDependencies": {
+      "com.vrchat.avatars": "3.10.x"
+    },
+    "developmentManifest": "Packages/vpm-manifest.json",
+    "developmentDependencies": {
+      "com.vrchat.avatars": {
+        "version": "3.10.4"
+      }
+    },
+    "developmentLocked": {
+      "com.vrchat.avatars": {
+        "version": "3.10.4",
+        "dependencies": {
+          "com.vrchat.base": "3.10.4"
+        }
+      },
+      "com.vrchat.base": {
+        "version": "3.10.4",
+        "dependencies": {}
+      }
+    },
+    "assemblyReference": "VRC.SDK3A",
+    "sourcePath": "Packages/com.teyocesu.avatar-doctor/Editor/Integrations/VRChat/VRChatAvatarDescriptorBoundary.cs",
+    "namespace": "Teyocesu.AvatarDoctor.Editor.Integrations.VRChat",
+    "sdkNamespace": "VRC.SDK3.Avatars.Components",
+    "sdkType": "VRCAvatarDescriptor"
+  },
   "requiredPackageFiles": [
     "CHANGELOG.md",
     "Editor/Core/AvatarDoctorPackageInfo.cs",
+    "Editor/Integrations.meta",
+    "Editor/Integrations/VRChat.meta",
+    "Editor/Integrations/VRChat/VRChatAvatarDescriptorBoundary.cs",
+    "Editor/Integrations/VRChat/VRChatAvatarDescriptorBoundary.cs.meta",
     "Editor/UI.meta",
     "Editor/UI/AvatarDoctorWindow.cs",
     "Editor/UI/AvatarDoctorWindow.cs.meta",
@@ -79,6 +111,13 @@
         "Unity runtime API",
         "Editor window",
         "Menu item",
+        "Method or invocation syntax"
+      ]
+    },
+    "Packages/com.teyocesu.avatar-doctor/Editor/Integrations/VRChat/VRChatAvatarDescriptorBoundary.cs": {
+      "profile": "vrchatSdkBoundary",
+      "allowedProhibitedCodePatterns": [
+        "VRChat SDK type",
         "Method or invocation syntax"
       ]
     }
@@ -267,12 +306,6 @@
         "trailingWhitespace"
       ]
     },
-    "Packages/vpm-manifest.json": {
-      "sha256": "2e55738d6a00b3341b9bea827ed10ffa4562a727226a810f7c6123df11695514",
-      "rules": [
-        "finalNewline"
-      ]
-    },
     "ProjectSettings/AudioManager.asset": {
       "sha256": "f2ed914f70919b6434c647bd820850be731b408f0f0c31e3bf7f98c8cafb617f",
       "rules": [
@@ -412,6 +445,14 @@
     {
       "name": "Reflection",
       "pattern": "(?:\\bSystem\\.Reflection\\b|\\bReflection\\b)"
+    },
+    {
+      "name": "Dynamic type loading",
+      "pattern": "(?:\\bAssembly\\s*\\.\\s*GetType\\s*\\(|\\bType\\s*\\.\\s*GetType\\s*\\()"
+    },
+    {
+      "name": "SDK type-name string",
+      "pattern": "\"[^\"\\n]*(?:VRCAvatarDescriptor|VRC\\.SDK3)[^\"\\n]*\""
     },
     {
       "name": "Asynchronous execution",

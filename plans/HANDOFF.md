@@ -33,15 +33,15 @@
 
 ## Current status
 
-Planning approved and GitHub work items created.
+Phase 1 SDK integration boundary implemented and validated; awaiting independent review.
 
 ## Last completed work
 
-Phase 0 — Planning and workflow bootstrap.
+Phase 1 implementation and local/Unity validation.
 
 ## Next gate
 
-Explicit authorization to start Phase 1 — VRChat SDK integration boundary.
+Independent Phase 1 review before Phase 2 — Scene avatar discovery.
 
 ## Known blockers
 
@@ -49,4 +49,4 @@ None.
 
 ## Implementation started
 
-No.
+Yes.

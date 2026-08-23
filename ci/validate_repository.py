@@ -211,6 +211,7 @@ def load_policy(root: Path) -> Dict[str, Any]:
         "expectedIdentity",
         "requiredRootFiles",
         "planningContract",
+        "sdkBoundary",
         "requiredPackageFiles",
         "allowedAssemblyDefinitions",
         "allowedNamespaces",
@@ -544,6 +545,63 @@ def load_policy(root: Path) -> Dict[str, Any]:
             "Validation policy planningContract paths do not match the active release."
         )
 
+    sdk_boundary = policy["sdkBoundary"]
+    sdk_boundary_keys = {
+        "packageDependencies",
+        "developmentManifest",
+        "developmentDependencies",
+        "developmentLocked",
+        "assemblyReference",
+        "sourcePath",
+        "namespace",
+        "sdkNamespace",
+        "sdkType",
+    }
+    expected_sdk_source = (
+        policy["packageRoot"]
+        + "/Editor/Integrations/VRChat/VRChatAvatarDescriptorBoundary.cs"
+    )
+    if not isinstance(sdk_boundary, dict) or set(sdk_boundary) != sdk_boundary_keys:
+        raise ValidatorConfigurationError(
+            "Validation policy sdkBoundary is incomplete."
+        )
+    if sdk_boundary["packageDependencies"] != {
+        "com.vrchat.avatars": "3.10.x"
+    }:
+        raise ValidatorConfigurationError(
+            "Validation policy SDK package dependency must be com.vrchat.avatars 3.10.x."
+        )
+    expected_development_dependencies = {
+        "com.vrchat.avatars": {"version": "3.10.4"}
+    }
+    expected_development_locked = {
+        "com.vrchat.avatars": {
+            "version": "3.10.4",
+            "dependencies": {"com.vrchat.base": "3.10.4"},
+        },
+        "com.vrchat.base": {"version": "3.10.4", "dependencies": {}},
+    }
+    if (
+        sdk_boundary["developmentManifest"] != "Packages/vpm-manifest.json"
+        or sdk_boundary["developmentDependencies"]
+        != expected_development_dependencies
+        or sdk_boundary["developmentLocked"] != expected_development_locked
+    ):
+        raise ValidatorConfigurationError(
+            "Validation policy development SDK resolution must be the exact stable 3.10.4 graph."
+        )
+    if (
+        sdk_boundary["assemblyReference"] != "VRC.SDK3A"
+        or sdk_boundary["sourcePath"] != expected_sdk_source
+        or sdk_boundary["namespace"]
+        != "Teyocesu.AvatarDoctor.Editor.Integrations.VRChat"
+        or sdk_boundary["sdkNamespace"] != "VRC.SDK3.Avatars.Components"
+        or sdk_boundary["sdkType"] != "VRCAvatarDescriptor"
+    ):
+        raise ValidatorConfigurationError(
+            "Validation policy SDK source and assembly boundary are not exact."
+        )
+
     public_content = policy["publicContent"]
     public_content_keys = (
         "requiredPaths",
@@ -623,6 +681,7 @@ def load_policy(root: Path) -> Dict[str, Any]:
     expected_source_profiles = {
         policy["packageRoot"] + "/Editor/Core/AvatarDoctorPackageInfo.cs": "constantsOnly",
         policy["packageRoot"] + "/Editor/UI/AvatarDoctorWindow.cs": "editorWindowShell",
+        sdk_boundary["sourcePath"]: "vrchatSdkBoundary",
     }
     if not isinstance(source_profiles, dict) or set(source_profiles) != set(
         expected_source_profiles
@@ -633,12 +692,19 @@ def load_policy(root: Path) -> Dict[str, Any]:
     prohibited_pattern_names = {
         entry["name"] for entry in policy["prohibitedCodePatterns"]
     }
-    required_window_exceptions = {
-        "Unity Editor API",
-        "Unity runtime API",
-        "Editor window",
-        "Menu item",
-        "Method or invocation syntax",
+    expected_profile_exceptions = {
+        "constantsOnly": set(),
+        "editorWindowShell": {
+            "Unity Editor API",
+            "Unity runtime API",
+            "Editor window",
+            "Menu item",
+            "Method or invocation syntax",
+        },
+        "vrchatSdkBoundary": {
+            "VRChat SDK type",
+            "Method or invocation syntax",
+        },
     }
     for path, expected_profile in sorted(expected_source_profiles.items()):
         configuration = source_profiles[path]
@@ -657,9 +723,7 @@ def load_policy(root: Path) -> Dict[str, Any]:
                 "Invalid source profile configuration for {0}.".format(path)
             )
         allowed_patterns = set(configuration["allowedProhibitedCodePatterns"])
-        expected_patterns = (
-            set() if expected_profile == "constantsOnly" else required_window_exceptions
-        )
+        expected_patterns = expected_profile_exceptions[expected_profile]
         if allowed_patterns != expected_patterns:
             raise ValidatorConfigurationError(
                 "Source profile exceptions are not exact for {0}.".format(path)
@@ -818,6 +882,100 @@ def expected_release_zip_url(policy: Dict[str, Any]) -> str:
     )
 
 
+def check_sdk_dependency_contract(context: RepositoryContext) -> List[Finding]:
+    check_id = "MANIFEST"
+    configuration = context.policy["sdkBoundary"]
+    package_manifest_path = context.policy["packageRoot"] + "/package.json"
+    package_manifest, package_error = parse_json_document(
+        context, package_manifest_path
+    )
+    findings: List[Finding] = []
+
+    if package_error or not isinstance(package_manifest, dict):
+        findings.append(
+            finding(
+                check_id,
+                package_manifest_path,
+                "SDK dependency contract could not be read.",
+                "Valid package JSON",
+            )
+        )
+    else:
+        expected_dependencies = configuration["packageDependencies"]
+        actual_dependencies = package_manifest.get("vpmDependencies")
+        if not isinstance(actual_dependencies, dict):
+            actual_dependencies = {}
+        for package_id, expected_range in sorted(expected_dependencies.items()):
+            if actual_dependencies.get(package_id) != expected_range:
+                findings.append(
+                    finding(
+                        check_id,
+                        package_manifest_path,
+                        "VPM dependency {0} is {1!r}.".format(
+                            package_id, actual_dependencies.get(package_id)
+                        ),
+                        repr(expected_range),
+                    )
+                )
+        for package_id in sorted(set(actual_dependencies) - set(expected_dependencies)):
+            findings.append(
+                finding(
+                    check_id,
+                    package_manifest_path,
+                    "Unexpected Avatar Doctor VPM dependency: {0}.".format(
+                        package_id
+                    ),
+                    "Only the approved com.vrchat.avatars dependency",
+                )
+            )
+
+    development_manifest_path = configuration["developmentManifest"]
+    development_manifest, development_error = parse_json_document(
+        context, development_manifest_path
+    )
+    if development_error or not isinstance(development_manifest, dict):
+        findings.append(
+            finding(
+                check_id,
+                development_manifest_path,
+                "Development VPM resolution manifest could not be read.",
+                "Valid VPM manifest JSON",
+            )
+        )
+        return findings
+
+    if set(development_manifest) != {"dependencies", "locked"}:
+        findings.append(
+            finding(
+                check_id,
+                development_manifest_path,
+                "Development VPM manifest fields are not exact.",
+                "dependencies and locked only",
+            )
+        )
+    if development_manifest.get("dependencies") != configuration[
+        "developmentDependencies"
+    ]:
+        findings.append(
+            finding(
+                check_id,
+                development_manifest_path,
+                "Development VPM direct dependency resolution differs from policy.",
+                "com.vrchat.avatars 3.10.4 only",
+            )
+        )
+    if development_manifest.get("locked") != configuration["developmentLocked"]:
+        findings.append(
+            finding(
+                check_id,
+                development_manifest_path,
+                "Development VPM locked dependency graph differs from policy.",
+                "com.vrchat.avatars 3.10.4 and com.vrchat.base 3.10.4 only",
+            )
+        )
+    return findings
+
+
 def check_manifest(context: RepositoryContext) -> List[Finding]:
     check_id = "MANIFEST"
     policy = context.policy
@@ -905,6 +1063,7 @@ def check_manifest(context: RepositoryContext) -> List[Finding]:
                 "No dependencies",
             )
         )
+    findings.extend(check_sdk_dependency_contract(context))
     return findings
 
 
@@ -1211,7 +1370,6 @@ def check_structure(context: RepositoryContext) -> List[Finding]:
     forbidden_directories = {
         "Correlation",
         "Diagnostics",
-        "Integrations",
         "Publishing",
         "Quest",
         "Repairs",
@@ -1221,9 +1379,30 @@ def check_structure(context: RepositoryContext) -> List[Finding]:
         "Tests",
     }
     package_prefix = package_root + "/"
+    sdk_source_path = policy["sdkBoundary"]["sourcePath"]
+    sdk_source_parent = PurePosixPath(sdk_source_path).parent
+    allowed_integration_paths = {
+        sdk_source_path,
+        sdk_source_path + ".meta",
+        sdk_source_parent.as_posix() + ".meta",
+        sdk_source_parent.parent.as_posix() + ".meta",
+    }
+    integration_prefix = package_root + "/Editor/Integrations"
     for relative_path in context.tracked_files:
         if not relative_path.startswith(package_prefix):
             continue
+        if (
+            relative_path.startswith(integration_prefix)
+            and relative_path not in allowed_integration_paths
+        ):
+            findings.append(
+                finding(
+                    check_id,
+                    relative_path,
+                    "Integration path is outside the exact Phase 1 SDK boundary.",
+                    "Only the approved VRChat boundary source and Unity metadata",
+                )
+            )
         package_parts = PurePosixPath(relative_path[len(package_prefix) :]).parts
         matched = sorted(forbidden_directories.intersection(package_parts))
         if matched:
@@ -1249,13 +1428,14 @@ def check_structure(context: RepositoryContext) -> List[Finding]:
         for path in context.tracked_files
         if path.startswith(package_prefix) and path.endswith(".cs")
     )
-    if len(own_sources) != 2:
+    expected_source_count = len(policy["sourceProfiles"])
+    if len(own_sources) != expected_source_count:
         findings.append(
             finding(
                 check_id,
                 package_root,
                 "Found {0} package C# source files.".format(len(own_sources)),
-                "Exactly 2",
+                "Exactly {0}".format(expected_source_count),
             )
         )
     editor_window_count = 0
@@ -1333,6 +1513,48 @@ def check_structure(context: RepositoryContext) -> List[Finding]:
     return findings
 
 
+def validate_sdk_assembly_references(
+    context: RepositoryContext, assembly_path: str, assembly: Dict[str, Any]
+) -> List[Finding]:
+    check_id = "ASSEMBLY"
+    expected_reference = context.policy["sdkBoundary"]["assemblyReference"]
+    findings: List[Finding] = []
+    if assembly.get("references") != [expected_reference]:
+        findings.append(
+            finding(
+                check_id,
+                assembly_path,
+                "Explicit assembly references are outside the approved SDK boundary.",
+                expected_reference + " only",
+            )
+        )
+    if assembly.get("precompiledReferences") != []:
+        findings.append(
+            finding(
+                check_id,
+                assembly_path,
+                "Precompiled assembly references are outside the approved SDK boundary.",
+                "No precompiled references",
+            )
+        )
+    return findings
+
+
+def check_package_binaries(context: RepositoryContext) -> List[Finding]:
+    check_id = "ASSEMBLY"
+    package_prefix = context.policy["packageRoot"] + "/"
+    return [
+        finding(
+            check_id,
+            path,
+            "Vendored DLL is not allowed inside the Avatar Doctor package.",
+            "Use the approved VPM dependency boundary",
+        )
+        for path in context.tracked_files
+        if path.startswith(package_prefix) and path.casefold().endswith(".dll")
+    ]
+
+
 def check_assembly(context: RepositoryContext) -> List[Finding]:
     check_id = "ASSEMBLY"
     policy = context.policy
@@ -1371,10 +1593,8 @@ def check_assembly(context: RepositoryContext) -> List[Finding]:
             "name": expected["name"],
             "rootNamespace": expected["rootNamespace"],
             "includePlatforms": expected["includePlatforms"],
-            "references": [],
             "allowUnsafeCode": False,
             "overrideReferences": False,
-            "precompiledReferences": [],
         }
         for key, expected_value in expectations.items():
             if assembly.get(key) != expected_value:
@@ -1386,16 +1606,10 @@ def check_assembly(context: RepositoryContext) -> List[Finding]:
                         repr(expected_value),
                     )
                 )
-        serialized = json.dumps(assembly, sort_keys=True)
-        if re.search(r"VRChat|VRC(?:SDK|\.)", serialized, re.IGNORECASE):
-            findings.append(
-                finding(
-                    check_id,
-                    assembly_path,
-                    "Assembly contains a VRChat SDK reference.",
-                    "No SDK references",
-                )
-            )
+        findings.extend(
+            validate_sdk_assembly_references(context, assembly_path, assembly)
+        )
+    findings.extend(check_package_binaries(context))
     return findings
 
 
@@ -1645,6 +1859,43 @@ def check_editor_window_source_profile(
     return findings
 
 
+def expected_vrchat_sdk_boundary_lines(
+    configuration: Dict[str, Any]
+) -> Tuple[str, ...]:
+    return (
+        "using {0};".format(configuration["sdkNamespace"]),
+        "namespace {0}".format(configuration["namespace"]),
+        "{",
+        "internal static class VRChatAvatarDescriptorBoundary",
+        "{",
+        "internal static {0} Preserve(".format(configuration["sdkType"]),
+        "{0} descriptor)".format(configuration["sdkType"]),
+        "{",
+        "return descriptor;",
+        "}",
+        "}",
+        "}",
+    )
+
+
+def check_vrchat_sdk_boundary_source_profile(
+    context: RepositoryContext, source_path: str, source: str
+) -> List[Finding]:
+    check_id = "SOURCE"
+    configuration = context.policy["sdkBoundary"]
+    actual_lines = tuple(line.strip() for line in source.splitlines() if line.strip())
+    if actual_lines == expected_vrchat_sdk_boundary_lines(configuration):
+        return []
+    return [
+        finding(
+            check_id,
+            source_path,
+            "VRChat SDK source differs from the exact compile-time boundary profile.",
+            "One internal identity boundary directly typed as VRCAvatarDescriptor",
+        )
+    ]
+
+
 def check_source(context: RepositoryContext) -> List[Finding]:
     check_id = "SOURCE"
     policy = context.policy
@@ -1693,6 +1944,12 @@ def check_source(context: RepositoryContext) -> List[Finding]:
                 )
             elif profile_name == "editorWindowShell":
                 findings.extend(check_editor_window_source_profile(source_path, source))
+            elif profile_name == "vrchatSdkBoundary":
+                findings.extend(
+                    check_vrchat_sdk_boundary_source_profile(
+                        context, source_path, source
+                    )
+                )
 
         namespaces = re.findall(
             r"\bnamespace\s+([A-Za-z_][A-Za-z0-9_.]*)", source
