@@ -103,6 +103,8 @@
     "Editor/UI.meta",
     "Editor/UI/AvatarDoctorWindow.cs",
     "Editor/UI/AvatarDoctorWindow.cs.meta",
+    "Editor/UI/AvatarDoctorWindowController.cs",
+    "Editor/UI/AvatarDoctorWindowController.cs.meta",
     "Editor/Teyocesu.AvatarDoctor.Editor.asmdef",
     "LICENSE.md",
     "README.md",
@@ -120,6 +122,8 @@
     "Tests/Editor/AvatarDiscoveryResultTests.cs.meta",
     "Tests/Editor/AvatarDiscoveryServiceTests.cs",
     "Tests/Editor/AvatarDiscoveryServiceTests.cs.meta",
+    "Tests/Editor/AvatarDoctorWindowControllerTests.cs",
+    "Tests/Editor/AvatarDoctorWindowControllerTests.cs.meta",
     "Tests/Editor/Teyocesu.AvatarDoctor.Editor.Tests.asmdef",
     "Tests/Editor/Teyocesu.AvatarDoctor.Editor.Tests.asmdef.meta",
     "package.json"
@@ -242,12 +246,26 @@
       ]
     },
     "Packages/com.teyocesu.avatar-doctor/Editor/UI/AvatarDoctorWindow.cs": {
-      "profile": "editorWindowShell",
+      "profile": "editorWindowDiscovery",
       "allowedProhibitedCodePatterns": [
         "Unity Editor API",
         "Unity runtime API",
         "Editor window",
         "Menu item",
+        "Editor selection",
+        "Runtime object API",
+        "Method or invocation syntax"
+      ]
+    },
+    "Packages/com.teyocesu.avatar-doctor/Editor/UI/AvatarDoctorWindowController.cs": {
+      "profile": "editorWindowController",
+      "allowedProhibitedCodePatterns": [
+        "Unity Editor API",
+        "Unity runtime API",
+        "Editor selection",
+        "Editor state",
+        "Scene API",
+        "Event subscription",
         "Method or invocation syntax"
       ]
     },
@@ -326,6 +344,15 @@
     },
     "Packages/com.teyocesu.avatar-doctor/Tests/Editor/AvatarSelectionTests.cs": {
       "profile": "phase3SelectionTests",
+      "allowedProhibitedCodePatterns": [
+        "Unity runtime API",
+        "Editor selection",
+        "Runtime object API",
+        "Method or invocation syntax"
+      ]
+    },
+    "Packages/com.teyocesu.avatar-doctor/Tests/Editor/AvatarDoctorWindowControllerTests.cs": {
+      "profile": "phase4WindowTests",
       "allowedProhibitedCodePatterns": [
         "Unity runtime API",
         "Editor selection",

@@ -679,6 +679,61 @@ class Phase3PackageContractTests(unittest.TestCase):
                 )
             )
 
+    def test_phase4_window_rejects_polling_and_uss(self) -> None:
+        documents = self.approved_source_documents()
+        window_path = (
+            "Packages/com.teyocesu.avatar-doctor/Editor/UI/AvatarDoctorWindow.cs"
+        )
+        documents[window_path] += (
+            "\nprivate void Update() { }\n"
+            "// VisualTreeAsset and CloneTree are outside the code-only UI boundary.\n"
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            context = self.create_context(Path(temporary), documents)
+            findings = validator.check_source(context)
+            messages = [item.message for item in findings if item.path == window_path]
+            self.assertTrue(any("polling" in message for message in messages))
+            self.assertTrue(any("UXML or USS" in message for message in messages))
+
+    def test_phase4_controller_rejects_selection_mutation(self) -> None:
+        documents = self.approved_source_documents()
+        controller_path = (
+            "Packages/com.teyocesu.avatar-doctor/Editor/UI/"
+            "AvatarDoctorWindowController.cs"
+        )
+        documents[controller_path] += "\nSelection.activeObject = null;\n"
+        with tempfile.TemporaryDirectory() as temporary:
+            context = self.create_context(Path(temporary), documents)
+            findings = validator.check_source(context)
+            self.assertTrue(
+                any(
+                    item.path == controller_path
+                    and "Unity Editor selection mutation" in item.message
+                    for item in findings
+                )
+            )
+
+    def test_phase4_controller_requires_supported_lifecycle_callbacks(self) -> None:
+        documents = self.approved_source_documents()
+        controller_path = (
+            "Packages/com.teyocesu.avatar-doctor/Editor/UI/"
+            "AvatarDoctorWindowController.cs"
+        )
+        documents[controller_path] = documents[controller_path].replace(
+            "EditorApplication.delayCall += unityCallback;",
+            "EditorApplication.delayCall = unityCallback;",
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            context = self.create_context(Path(temporary), documents)
+            findings = validator.check_source(context)
+            self.assertTrue(
+                any(
+                    item.path == controller_path
+                    and "lifecycle fragment" in item.message
+                    for item in findings
+                )
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

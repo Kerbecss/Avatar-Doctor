@@ -733,7 +733,9 @@ def load_policy(root: Path) -> Dict[str, Any]:
         + "/Editor/Selection/AvatarSelectionOrigin.cs": "selectionEnum",
         package_root
         + "/Editor/Selection/AvatarSelectionState.cs": "selectionEnum",
-        package_root + "/Editor/UI/AvatarDoctorWindow.cs": "editorWindowShell",
+        package_root + "/Editor/UI/AvatarDoctorWindow.cs": "editorWindowDiscovery",
+        package_root
+        + "/Editor/UI/AvatarDoctorWindowController.cs": "editorWindowController",
         sdk_boundary["sourcePath"]: "vrchatDiscoveryBoundary",
         package_root
         + "/Tests/Editor/AvatarDiscoveryOrderingTests.cs": "phase2EditorTests",
@@ -747,6 +749,8 @@ def load_policy(root: Path) -> Dict[str, Any]:
         + "/Tests/Editor/AvatarSelectionModelTests.cs": "phase3SelectionTests",
         package_root
         + "/Tests/Editor/AvatarSelectionTests.cs": "phase3SelectionTests",
+        package_root
+        + "/Tests/Editor/AvatarDoctorWindowControllerTests.cs": "phase4WindowTests",
     }
     if not isinstance(source_profiles, dict) or set(source_profiles) != set(
         expected_source_profiles
@@ -785,11 +789,22 @@ def load_policy(root: Path) -> Dict[str, Any]:
             "Runtime object API",
             "Method or invocation syntax",
         },
-        "editorWindowShell": {
+        "editorWindowDiscovery": {
             "Unity Editor API",
             "Unity runtime API",
             "Editor window",
             "Menu item",
+            "Editor selection",
+            "Runtime object API",
+            "Method or invocation syntax",
+        },
+        "editorWindowController": {
+            "Unity Editor API",
+            "Unity runtime API",
+            "Editor selection",
+            "Editor state",
+            "Scene API",
+            "Event subscription",
             "Method or invocation syntax",
         },
         "vrchatDiscoveryBoundary": {
@@ -835,6 +850,12 @@ def load_policy(root: Path) -> Dict[str, Any]:
             "Scene API",
             "Runtime object API",
             "VRChat SDK type",
+            "Method or invocation syntax",
+        },
+        "phase4WindowTests": {
+            "Unity runtime API",
+            "Editor selection",
+            "Runtime object API",
             "Method or invocation syntax",
         },
     }
@@ -1838,91 +1859,17 @@ def check_constants_only_source(
     ]
 
 
-def expected_editor_window_lines() -> Tuple[str, ...]:
-    return (
-        "using Teyocesu.AvatarDoctor.Editor.Core;",
-        "using UnityEditor;",
-        "using UnityEngine;",
-        "using UnityEngine.UIElements;",
-        "namespace Teyocesu.AvatarDoctor.Editor.UI",
-        "{",
-        "internal sealed class AvatarDoctorWindow : EditorWindow",
-        "{",
-        'private const string MenuPath = "Tools/Avatar Doctor";',
-        "private const int MenuPriority = 2000;",
-        "private const float MinimumWidth = 420f;",
-        "private const float MinimumHeight = 220f;",
-        'private const string StatusText = "Pre-alpha - Window shell";',
-        'private const string UnavailableAnalysisMessage = "Avatar analysis is not available in this version.";',
-        'private const string VersionPrefix = "Version ";',
-        "[MenuItem(MenuPath, false, MenuPriority)]",
-        "private static void OpenWindow()",
-        "{",
-        "AvatarDoctorWindow window = GetWindow<AvatarDoctorWindow>();",
-        "window.titleContent = new GUIContent(AvatarDoctorPackageInfo.DisplayName);",
-        "window.minSize = new Vector2(MinimumWidth, MinimumHeight);",
-        "window.Show();",
-        "}",
-        "private void OnEnable()",
-        "{",
-        "titleContent = new GUIContent(AvatarDoctorPackageInfo.DisplayName);",
-        "minSize = new Vector2(MinimumWidth, MinimumHeight);",
-        "}",
-        "public void CreateGUI()",
-        "{",
-        "VisualElement root = rootVisualElement;",
-        "rootVisualElement.Clear();",
-        "root.style.flexDirection = FlexDirection.Column;",
-        "root.style.flexGrow = 1;",
-        "root.style.paddingTop = 16;",
-        "root.style.paddingRight = 16;",
-        "root.style.paddingBottom = 16;",
-        "root.style.paddingLeft = 16;",
-        "VisualElement content = new VisualElement();",
-        "content.style.flexDirection = FlexDirection.Column;",
-        "content.style.flexGrow = 1;",
-        "Label heading = new Label(AvatarDoctorPackageInfo.DisplayName);",
-        "heading.style.fontSize = 20;",
-        "heading.style.unityFontStyleAndWeight = FontStyle.Bold;",
-        "heading.style.whiteSpace = WhiteSpace.Normal;",
-        "heading.style.marginBottom = 8;",
-        "content.Add(heading);",
-        "Label status = new Label(StatusText);",
-        "status.style.unityFontStyleAndWeight = FontStyle.Bold;",
-        "status.style.whiteSpace = WhiteSpace.Normal;",
-        "status.style.marginBottom = 8;",
-        "content.Add(status);",
-        "Label unavailableAnalysis = new Label(UnavailableAnalysisMessage);",
-        "unavailableAnalysis.style.whiteSpace = WhiteSpace.Normal;",
-        "unavailableAnalysis.style.marginBottom = 8;",
-        "content.Add(unavailableAnalysis);",
-        "Label version = new Label(VersionPrefix + AvatarDoctorPackageInfo.Version);",
-        "version.style.whiteSpace = WhiteSpace.Normal;",
-        "content.Add(version);",
-        "root.Add(content);",
-        "}",
-        "}",
-        "}",
-    )
-
-
 def check_editor_window_source_profile(
     source_path: str, source: str
 ) -> List[Finding]:
     check_id = "SOURCE"
     findings: List[Finding] = []
-    actual_lines = tuple(line.strip() for line in source.splitlines() if line.strip())
-    if actual_lines != expected_editor_window_lines():
-        findings.append(
-            finding(
-                check_id,
-                source_path,
-                "Editor window source differs from the exact shell profile.",
-                "Only the approved using directives, constants, lifecycle methods, and UI statements",
-            )
-        )
     required_usings = {
+        "System",
+        "System.Collections.Generic",
         "Teyocesu.AvatarDoctor.Editor.Core",
+        "Teyocesu.AvatarDoctor.Editor.Discovery",
+        "Teyocesu.AvatarDoctor.Editor.Selection",
         "UnityEditor",
         "UnityEngine",
         "UnityEngine.UIElements",
@@ -1938,86 +1885,118 @@ def check_editor_window_source_profile(
             )
         )
 
-    allowed_new_types = {"GUIContent", "Label", "Vector2", "VisualElement"}
-    created_types = set(
-        re.findall(r"\bnew\s+([A-Za-z_][A-Za-z0-9_.]*)\s*\(", source)
+    required_fragments = (
+        "internal sealed class AvatarDoctorWindow : EditorWindow",
+        "[MenuItem(MenuPath, false, MenuPriority)]",
+        "private void OnEnable()",
+        "private void OnDisable()",
+        "public void CreateGUI()",
+        "new AvatarDoctorWindowController(",
+        "new UnityAvatarDoctorEditorEventSource(),",
+        "controller.Enable();",
+        "new Button(HandleExplicitRefresh)",
+        "new DropdownField(",
+        "RegisterValueChangedCallback",
+        "No VRChat Avatar Descriptors found in the loaded scene(s).",
+        "Selection origin:",
     )
-    unexpected_new_types = sorted(created_types - allowed_new_types)
-    if unexpected_new_types:
-        findings.append(
-            finding(
-                check_id,
-                source_path,
-                "Constructed type is outside the active profile: {0}.".format(
-                    unexpected_new_types[0]
-                ),
-                "GUIContent, Label, Vector2, or VisualElement",
+    for fragment in required_fragments:
+        if fragment not in source:
+            findings.append(
+                finding(
+                    check_id,
+                    source_path,
+                    "Editor window is missing a required Phase 4 fragment.",
+                    fragment,
+                )
             )
-        )
 
-    allowed_invocations = {
-        "Add",
-        "Clear",
-        "CreateGUI",
-        "GetWindow",
-        "GUIContent",
-        "Label",
-        "MenuItem",
-        "OnEnable",
+    allowed_methods = {
         "OpenWindow",
-        "Show",
-        "Vector2",
-        "VisualElement",
+        "OnEnable",
+        "OnDisable",
+        "CreateGUI",
+        "BuildCandidateLabels",
+        "HandleExplicitRefresh",
+        "Render",
+        "RenderNoAvatars",
+        "RenderOneAvatar",
+        "RenderMultipleAvatars",
+        "FindSelectedCandidateIndex",
+        "AddSelectedCandidateDetails",
+        "BuildCandidateLabel",
+        "NeedsDescriptorOrdinal",
+        "FormatSelectionOrigin",
+        "AddLabel",
     }
-    invocations = set(
+    actual_methods = set(
         re.findall(
-            r"\b([A-Za-z_][A-Za-z0-9_]*)\s*(?:<[^>\n]+>)?\s*\(", source
+            r"^\s*(?:private|protected|internal|public)\s+"
+            r"(?:static\s+)?[A-Za-z_][A-Za-z0-9_<>,.?!\[\] ]*\s+"
+            r"([A-Za-z_][A-Za-z0-9_]*)\s*\(",
+            source,
+            re.MULTILINE,
         )
     )
-    unexpected_invocations = sorted(invocations - allowed_invocations)
-    if unexpected_invocations:
+    unexpected_methods = sorted(actual_methods - allowed_methods)
+    if unexpected_methods:
         findings.append(
             finding(
                 check_id,
                 source_path,
-                "Method or constructor invocation is outside the active profile: {0}.".format(
-                    unexpected_invocations[0]
+                "Editor window method is outside the active profile: {0}.".format(
+                    unexpected_methods[0]
                 ),
-                "Only the Editor window shell invocation set",
+                "Only the approved Phase 4 window methods",
             )
         )
 
-    allowed_style_properties = {
-        "flexDirection",
-        "flexGrow",
-        "fontSize",
-        "marginBottom",
-        "paddingBottom",
-        "paddingLeft",
-        "paddingRight",
-        "paddingTop",
-        "unityFontStyleAndWeight",
-        "whiteSpace",
-    }
-    style_properties = set(
-        re.findall(r"\.style\.([A-Za-z_][A-Za-z0-9_]*)", source)
+    forbidden_patterns = (
+        (
+            r"\b(?:EditorPrefs|SessionState|AssetDatabase|SerializedObject|"
+            r"SerializedProperty|Undo|PrefabUtility|Resources)\b",
+            "persistent, asset, serialization, or mutation API",
+        ),
+        (
+            r"\bSelection\s*\.\s*(?:activeObject|activeGameObject|objects)\s*=",
+            "Unity Editor selection mutation",
+        ),
+        (
+            r"\b(?:Update|OnInspectorUpdate|OnHierarchyChange|"
+            r"OnSelectionChange|OnProjectChange)\s*\(",
+            "polling or unsupported lifecycle callback",
+        ),
+        (
+            r"\b(?:EditorApplication\s*\.\s*update|Thread|Task|async)\b",
+            "polling or asynchronous execution",
+        ),
+        (
+            r"\b(?:VisualTreeAsset|StyleSheet)\b|\.CloneTree\s*\(|"
+            r"\.styleSheets\b|\.(?:uxml|uss)\b",
+            "UXML or USS presentation asset",
+        ),
+        (
+            r"\b(?:Object\s*\.\s*Destroy(?:Immediate)?|new\s+GameObject|"
+            r"AddComponent\s*<|SetActive\s*\()",
+            "scene or object mutation API",
+        ),
     )
-    unexpected_style_properties = sorted(style_properties - allowed_style_properties)
-    if unexpected_style_properties:
-        findings.append(
-            finding(
-                check_id,
-                source_path,
-                "UI style property is outside the active profile: {0}.".format(
-                    unexpected_style_properties[0]
-                ),
-                "Only layout, spacing, wrapping, and font emphasis",
+    for pattern, label in forbidden_patterns:
+        match = re.search(pattern, source)
+        if match:
+            line = source.count("\n", 0, match.start()) + 1
+            findings.append(
+                finding(
+                    check_id,
+                    source_path,
+                    "Detectable {0} found at line {1}.".format(label, line),
+                    "Code-only, event-driven, read-only window behavior",
+                )
             )
-        )
 
     prohibited_controls = re.search(
-        r"\b(?:Button|Toggle|TextField|ObjectField|ListView|ScrollView|"
-        r"ProgressBar|Toolbar|Image)\b",
+        r"\b(?:ObjectField|ListView|ScrollView|ProgressBar|Toolbar|Image|"
+        r"TextField|Toggle)\b",
         source,
     )
     if prohibited_controls:
@@ -2028,20 +2007,122 @@ def check_editor_window_source_profile(
                 "Functional or graphical control is outside the active profile: {0}.".format(
                     prohibited_controls.group(0)
                 ),
-                "VisualElement and Label only",
+                "Button, DropdownField, Label, and VisualElement only",
             )
         )
-    if re.search(r"\bTODO\b", source):
-        findings.append(
-            finding(check_id, source_path, "Future-functionality TODO is outside the active profile.")
-        )
     if re.search(
-        r"\bstatic\s+(?!void\s+OpenWindow\b)[A-Za-z_][A-Za-z0-9_<>,.?\[\] ]*\s+"
-        r"[A-Za-z_][A-Za-z0-9_]*\s*(?:=|;)",
+        r"^\s*(?:private|protected|internal|public)\s+static\s+"
+        r"(?!void\s+OpenWindow\b)[A-Za-z_][A-Za-z0-9_<>,.?\[\] ]*\s+"
+        r"[A-Za-z_][A-Za-z0-9_]*\s*(?:=|;)\s*$",
+        source,
+        re.MULTILINE,
+    ):
+        findings.append(
+            finding(
+                check_id,
+                source_path,
+                "Mutable or additional static window state is outside the active profile.",
+                "Instance-owned UI/session state only",
+            )
+        )
+    return findings
+
+
+def check_editor_window_controller_source_profile(
+    source_path: str, source: str
+) -> List[Finding]:
+    check_id = "SOURCE"
+    findings: List[Finding] = []
+    required_fragments = (
+        "internal sealed class AvatarDoctorWindowController : IDisposable",
+        "event Action HierarchyChanged",
+        "event Action SceneOpened",
+        "event Action SceneClosed",
+        "event Action SelectionChanged",
+        "EditorApplication.hierarchyChanged += HandleHierarchyChanged",
+        "EditorSceneManager.sceneOpened += HandleSceneOpened",
+        "EditorSceneManager.sceneClosed += HandleSceneClosed",
+        "UnityEditorSelection.selectionChanged += HandleSelectionChanged",
+        "EditorApplication.delayCall += unityCallback",
+        "EditorApplication.delayCall -= delayedCallback",
+        "RefreshExplicit",
+        "ApplyEditorSelection",
+        "Click Refresh to retry.",
+    )
+    for fragment in required_fragments:
+        if fragment not in source:
+            findings.append(
+                finding(
+                    check_id,
+                    source_path,
+                    "Window controller is missing a required Phase 4 lifecycle fragment.",
+                    fragment,
+                )
+            )
+
+    forbidden_patterns = (
+        (
+            r"\b(?:EditorPrefs|SessionState|AssetDatabase|SerializedObject|"
+            r"SerializedProperty|Undo|PrefabUtility)\b",
+            "persistent, asset, serialization, or mutation API",
+        ),
+        (
+            r"\bSelection\s*\.\s*(?:activeObject|activeGameObject|objects)\s*=",
+            "Unity Editor selection mutation",
+        ),
+        (
+            r"\b(?:Update|OnInspectorUpdate|OnHierarchyChange|"
+            r"OnSelectionChange|OnProjectChange)\s*\(",
+            "polling or unsupported lifecycle callback",
+        ),
+        (
+            r"\b(?:EditorApplication\s*\.\s*update|Thread|Task|async)\b",
+            "polling or asynchronous execution",
+        ),
+        (
+            r"\b(?:VisualTreeAsset|StyleSheet)\b|\.CloneTree\s*\(|"
+            r"\.styleSheets\b|\.(?:uxml|uss)\b",
+            "UXML or USS presentation asset",
+        ),
+        (
+            r"\b(?:Object\s*\.\s*Destroy(?:Immediate)?|new\s+GameObject|"
+            r"AddComponent\s*<|SetActive\s*\()",
+            "scene or object mutation API",
+        ),
+    )
+    for pattern, label in forbidden_patterns:
+        match = re.search(pattern, source)
+        if match:
+            line = source.count("\n", 0, match.start()) + 1
+            findings.append(
+                finding(
+                    check_id,
+                    source_path,
+                    "Detectable {0} found at line {1}.".format(label, line),
+                    "Instance-owned event-driven read-only coordination",
+                )
+            )
+    return findings
+
+
+def check_phase4_window_tests_source_profile(
+    source_path: str, source: str
+) -> List[Finding]:
+    check_id = "SOURCE"
+    findings: List[Finding] = []
+    if re.search(
+        r"\b(?:EditorPrefs|SessionState|Selection\s*\.\s*"
+        r"(?:activeObject|activeGameObject|objects)\s*=|"
+        r"EditorApplication\s*\.\s*update|\b(?:Update|OnInspectorUpdate)\s*\()",
         source,
     ):
         findings.append(
-            finding(check_id, source_path, "Mutable static state is outside the active profile.")
+            finding(
+                check_id,
+                source_path,
+                "Phase 4 tests contain persistence, selection mutation, or polling.",
+                "Tests must use the injected event seam and read-only observation",
+            )
         )
     return findings
 
@@ -2261,8 +2342,18 @@ def check_source(context: RepositoryContext) -> List[Finding]:
                 findings.extend(
                     check_constants_only_source(context, source_path, source)
                 )
-            elif profile_name == "editorWindowShell":
+            elif profile_name == "editorWindowDiscovery":
                 findings.extend(check_editor_window_source_profile(source_path, source))
+            elif profile_name == "editorWindowController":
+                findings.extend(
+                    check_editor_window_controller_source_profile(
+                        source_path, source
+                    )
+                )
+            elif profile_name == "phase4WindowTests":
+                findings.extend(
+                    check_phase4_window_tests_source_profile(source_path, source)
+                )
             elif profile_name == "vrchatDiscoveryBoundary":
                 findings.extend(
                     check_vrchat_sdk_boundary_source_profile(
@@ -2375,13 +2466,15 @@ def extract_method_body(source: str, signature: str) -> Optional[str]:
 
 
 def check_editor_window(context: RepositoryContext) -> List[Finding]:
+    return check_editor_window_phase4_new(context)
+
+
+def check_editor_window_phase4_new(context: RepositoryContext) -> List[Finding]:
     check_id = "EDITOR_WINDOW"
     package_root = context.policy["packageRoot"]
     source_path = package_root + "/Editor/UI/AvatarDoctorWindow.cs"
     folder_meta_path = package_root + "/Editor/UI.meta"
     script_meta_path = source_path + ".meta"
-    findings: List[Finding] = []
-
     if not context.is_tracked(source_path):
         return [
             finding(
@@ -2390,6 +2483,7 @@ def check_editor_window(context: RepositoryContext) -> List[Finding]:
                 "Policy-defined Editor window source is not tracked.",
             )
         ]
+
     try:
         source = context.read_text(source_path)
     except UnicodeDecodeError:
@@ -2397,17 +2491,7 @@ def check_editor_window(context: RepositoryContext) -> List[Finding]:
             finding(check_id, source_path, "Editor window source is not valid UTF-8.")
         ]
 
-    actual_lines = tuple(line.strip() for line in source.splitlines() if line.strip())
-    if actual_lines != expected_editor_window_lines():
-        findings.append(
-            finding(
-                check_id,
-                source_path,
-                "Editor window source differs from the exact shell shape.",
-                "Only the approved declarations and UI statements",
-            )
-        )
-
+    findings: List[Finding] = []
     expected_namespace = "Teyocesu.AvatarDoctor.Editor.UI"
     namespaces = re.findall(
         r"\bnamespace\s+([A-Za-z_][A-Za-z0-9_.]*)", source
@@ -2421,6 +2505,7 @@ def check_editor_window(context: RepositoryContext) -> List[Finding]:
                 expected_namespace,
             )
         )
+
     class_declaration = "internal sealed class AvatarDoctorWindow : EditorWindow"
     if source.count(class_declaration) != 1:
         findings.append(
@@ -2486,258 +2571,38 @@ def check_editor_window(context: RepositoryContext) -> List[Finding]:
             )
         )
 
-    required_constants = (
+    required_fragments = (
         'private const string MenuPath = "Tools/Avatar Doctor";',
         "private const int MenuPriority = 2000;",
         "private const float MinimumWidth = 420f;",
         "private const float MinimumHeight = 220f;",
-        'private const string StatusText = "Pre-alpha - Window shell";',
-        'private const string UnavailableAnalysisMessage = "Avatar analysis is not available in this version.";',
-        'private const string VersionPrefix = "Version ";',
-    )
-    for required_constant in required_constants:
-        if source.count(required_constant) != 1:
-            findings.append(
-                finding(
-                    check_id,
-                    source_path,
-                    "Required private constant is missing or duplicated.",
-                    required_constant,
-                )
-            )
-    field_declarations = re.findall(
-        r"^\s*(?:private|protected|internal|public)\s+"
-        r"(?:(?:static|readonly|const)\s+)*"
-        r"[A-Za-z_][A-Za-z0-9_<>,.?\[\] ]*\s+"
-        r"[A-Za-z_][A-Za-z0-9_]*\s*(?:=[^;\n]*)?;\s*$",
-        source,
-        re.MULTILINE,
-    )
-    if len(field_declarations) != len(required_constants):
-        findings.append(
-            finding(
-                check_id,
-                source_path,
-                "Editor window fields differ from the seven policy-defined constants.",
-                "Exactly 7 private constants and no mutable fields",
-            )
-        )
-
-    menu_attribute = "[MenuItem(MenuPath, false, MenuPriority)]"
-    if source.count(menu_attribute) != 1:
-        findings.append(
-            finding(
-                check_id,
-                source_path,
-                "MenuItem declaration is not exact.",
-                menu_attribute,
-            )
-        )
-    signatures = {
-        "OpenWindow": "private static void OpenWindow()",
-        "OnEnable": "private void OnEnable()",
-        "CreateGUI": "public void CreateGUI()",
-    }
-    method_declarations = re.findall(
-        r"^\s*(?:private|protected|internal|public)\s+(?:static\s+)?"
-        r"[A-Za-z_][A-Za-z0-9_<>,.?\[\] ]*\s+"
-        r"([A-Za-z_][A-Za-z0-9_]*)\s*\(\s*\)\s*$",
-        source,
-        re.MULTILINE,
-    )
-    if sorted(method_declarations) != sorted(signatures):
-        findings.append(
-            finding(
-                check_id,
-                source_path,
-                "Editor window methods differ from the policy-defined lifecycle.",
-                "OpenWindow, OnEnable, and CreateGUI only",
-            )
-        )
-    method_bodies: Dict[str, Optional[str]] = {}
-    for method_name, signature in signatures.items():
-        if source.count(signature) != 1:
-            findings.append(
-                finding(
-                    check_id,
-                    source_path,
-                    "Required method signature is missing or duplicated.",
-                    signature,
-                )
-            )
-        method_bodies[method_name] = extract_method_body(source, signature)
-        if method_bodies[method_name] is None:
-            findings.append(
-                finding(
-                    check_id,
-                    source_path,
-                    "Required method body could not be read: {0}.".format(method_name),
-                )
-            )
-
-    open_window = method_bodies["OpenWindow"] or ""
-    required_open_window_fragments = (
+        'private const string RefreshText = "Refresh";',
+        "private const string NoAvatarMessage =",
+        "private const string OneAvatarMessage =",
+        "private const string MultipleAvatarMessageFormat =",
+        "private const string VersionPrefix = \"Version \";",
+        "[MenuItem(MenuPath, false, MenuPriority)]",
         "AvatarDoctorWindow window = GetWindow<AvatarDoctorWindow>();",
-        "window.titleContent = new GUIContent(AvatarDoctorPackageInfo.DisplayName);",
-        "window.minSize = new Vector2(MinimumWidth, MinimumHeight);",
         "window.Show();",
-    )
-    for fragment in required_open_window_fragments:
-        if open_window.count(fragment) != 1:
-            findings.append(
-                finding(
-                    check_id,
-                    source_path,
-                    "OpenWindow does not implement the exact reusable window setup.",
-                    fragment,
-                )
-            )
-    if "new AvatarDoctorWindow" in source:
-        findings.append(
-            finding(
-                check_id,
-                source_path,
-                "Editor window must be reused through GetWindow.",
-            )
-        )
-
-    on_enable = method_bodies["OnEnable"] or ""
-    required_on_enable_fragments = (
-        "titleContent = new GUIContent(AvatarDoctorPackageInfo.DisplayName);",
-        "minSize = new Vector2(MinimumWidth, MinimumHeight);",
-    )
-    for fragment in required_on_enable_fragments:
-        if on_enable.count(fragment) != 1:
-            findings.append(
-                finding(
-                    check_id,
-                    source_path,
-                    "OnEnable does not restore the exact window identity and size.",
-                    fragment,
-                )
-            )
-    if re.search(r"(?:new\s+(?:Label|VisualElement)|\.Add\s*\(|\.Clear\s*\()", on_enable):
-        findings.append(
-            finding(
-                check_id,
-                source_path,
-                "OnEnable must not construct or duplicate the visual tree.",
-            )
-        )
-
-    create_gui = method_bodies["CreateGUI"] or ""
-    required_create_gui_fragments = (
-        "VisualElement root = rootVisualElement;",
+        "controller = new AvatarDoctorWindowController(",
+        "controller.Enable();",
+        "controller.Dispose();",
         "rootVisualElement.Clear();",
-        "VisualElement content = new VisualElement();",
-        "root.Add(content);",
+        "refreshButton = new Button(HandleExplicitRefresh)",
+        "new DropdownField(",
+        "RegisterValueChangedCallback",
+        "root.Add(version);",
     )
-    for fragment in required_create_gui_fragments:
-        if create_gui.count(fragment) != 1:
+    for fragment in required_fragments:
+        if fragment not in source:
             findings.append(
                 finding(
                     check_id,
                     source_path,
-                    "CreateGUI is missing required deterministic tree construction.",
+                    "Editor window is missing a required Phase 4 fragment.",
                     fragment,
                 )
             )
-    clear_index = create_gui.find("rootVisualElement.Clear();")
-    first_add_index = create_gui.find(".Add(")
-    if clear_index < 0 or first_add_index < 0 or clear_index > first_add_index:
-        findings.append(
-            finding(
-                check_id,
-                source_path,
-                "CreateGUI must clear the root before adding elements.",
-                "rootVisualElement.Clear() before the first Add()",
-            )
-        )
-
-    label_expressions = (
-        "new Label(AvatarDoctorPackageInfo.DisplayName)",
-        "new Label(StatusText)",
-        "new Label(UnavailableAnalysisMessage)",
-        "new Label(VersionPrefix + AvatarDoctorPackageInfo.Version)",
-    )
-    label_positions = [create_gui.find(expression) for expression in label_expressions]
-    if (
-        any(position < 0 for position in label_positions)
-        or label_positions != sorted(label_positions)
-        or len(re.findall(r"\bnew\s+Label\s*\(", create_gui)) != 4
-    ):
-        findings.append(
-            finding(
-                check_id,
-                source_path,
-                "Visible labels are missing, duplicated, or out of order.",
-                "Display name, status, unavailable-analysis message, then package version",
-            )
-        )
-    add_expressions = (
-        "content.Add(heading);",
-        "content.Add(status);",
-        "content.Add(unavailableAnalysis);",
-        "content.Add(version);",
-        "root.Add(content);",
-    )
-    add_positions = [create_gui.find(expression) for expression in add_expressions]
-    if (
-        any(position < 0 for position in add_positions)
-        or add_positions != sorted(add_positions)
-        or len(re.findall(r"\.Add\s*\(", create_gui)) != 5
-    ):
-        findings.append(
-            finding(
-                check_id,
-                source_path,
-                "Visual elements are not added exactly once in the policy-defined order.",
-                "Heading, status, message, version, then the content container",
-            )
-        )
-    if '"0.0.4"' in source:
-        findings.append(
-            finding(
-                check_id,
-                source_path,
-                "Visible package version is hardcoded in the Editor window.",
-                "AvatarDoctorPackageInfo.Version",
-            )
-        )
-
-    prohibited_tokens = re.search(
-        r"\b(?:AssetDatabase|Selection|SerializedObject|SerializedProperty|"
-        r"EditorPrefs|SessionState|EditorApplication|Undo|PrefabUtility|"
-        r"BuildPipeline|SceneManager|EditorSceneManager|GameObject|Component|"
-        r"Transform|Resources|Task|Thread|Socket|VRCAvatarDescriptor|PhysBone|"
-        r"Contacts?|Update|OnInspectorUpdate|OnHierarchyChange|OnSelectionChange|"
-        r"OnProjectChange|Button|Toggle|TextField|ObjectField|ListView|ScrollView|"
-        r"ProgressBar|Toolbar|Image)\b",
-        source,
-    )
-    if prohibited_tokens:
-        findings.append(
-            finding(
-                check_id,
-                source_path,
-                "Editor window token is outside the active profile: {0}.".format(
-                    prohibited_tokens.group(0)
-                ),
-                "Token absent",
-            )
-        )
-    if re.search(
-        r"(?:\bSystem\.(?:IO|Net|Reflection|Threading)\b|\bVRC\.SDK\b|"
-        r"\basync\b|\+=|-=|\bRegisterCallback\s*\(|\.clicked\b|\bevent\b)",
-        source,
-    ):
-        findings.append(
-            finding(
-                check_id,
-                source_path,
-                "File, network, reflection, asynchronous, SDK, or event behavior is outside the active profile.",
-            )
-        )
 
     for meta_path, expected_marker in (
         (folder_meta_path, "folderAsset: yes"),

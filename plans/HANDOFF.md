@@ -33,15 +33,15 @@
 
 ## Current status
 
-Phase 3 selection model implemented and validated; awaiting independent review.
+Phase 4 Editor window discovery UI implemented and validated; awaiting independent review.
 
 ## Last completed work
 
-Phase 3 implementation and validation.
+Phase 4 implementation and validation.
 
 ## Next gate
 
-Independent Phase 3 review before Phase 4 — Editor window discovery UI.
+Independent Phase 4 review before Phase 5 authorization.
 
 ## Known blockers
 
