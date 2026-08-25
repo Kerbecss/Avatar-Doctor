@@ -33,15 +33,15 @@
 
 ## Current status
 
-Phase 4 Editor window discovery UI implemented and validated; awaiting independent review.
+Phase 5 Unity validation and hardening completed; awaiting independent review.
 
 ## Last completed work
 
-Phase 4 implementation and validation.
+Phase 5 validation and hardening.
 
 ## Next gate
 
-Independent Phase 4 review before Phase 5 authorization.
+Independent Phase 5 review before Phase 6 release preparation authorization.
 
 ## Known blockers
 
