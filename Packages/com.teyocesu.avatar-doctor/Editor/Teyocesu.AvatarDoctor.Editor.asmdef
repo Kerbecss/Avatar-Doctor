@@ -1,7 +1,9 @@
 {
   "name": "Teyocesu.AvatarDoctor.Editor",
   "rootNamespace": "Teyocesu.AvatarDoctor.Editor",
-  "references": [],
+  "references": [
+    "VRC.SDK3A"
+  ],
   "includePlatforms": [
     "Editor"
   ],
